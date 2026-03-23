@@ -1,4 +1,5 @@
 import array
+import random
 
 class StandardPostings:
     """ 
@@ -532,3 +533,27 @@ if __name__ == '__main__':
         assert decoded_posting_list == postings_list, "hasil decoding tidak sama dengan postings original"
         assert decoded_tf_list == tf_list, "hasil decoding tidak sama dengan postings original"
         print()
+
+    print(" --- Big Test Case (500 elements) --- ")
+    
+    big_postings_list = []
+    current_id = random.randint(1, 100)
+    for _ in range(500):
+        big_postings_list.append(current_id)
+        current_id += random.randint(1, 100)
+
+    big_postings_list[-2] = big_postings_list[-3] + random.randint(2 ** 10, 2 ** 11 - 1)
+    big_postings_list[-1] = big_postings_list[-2] + random.randint(2 ** 20, 2 ** 21 - 1)
+    
+    big_tf_list = [random.randint(1, 100) for _ in range(500)]
+    
+    for Postings in [StandardPostings, VBEPostings, OptPForDeltaPostings]:
+        encoded_postings = Postings.encode(big_postings_list)
+        encoded_tf = Postings.encode_tf(big_tf_list)
+        
+        print(f"{Postings.__name__}:")
+        print(f"  Postings encoded size: {len(encoded_postings)} bytes")
+        print(f"  TF list encoded size : {len(encoded_tf)} bytes")
+        
+        assert Postings.decode(encoded_postings) == big_postings_list
+        assert Postings.decode_tf(encoded_tf) == big_tf_list
