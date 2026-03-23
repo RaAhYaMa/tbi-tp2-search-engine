@@ -238,16 +238,102 @@ class VBEPostings:
         return VBEPostings.vb_decode(encoded_tf_list)
 
 class OptPForDeltaPostings:
+    BLOCK_SIZE = 128
+
     """ 
     OptPForDelta compression.
-    Algoritma ini membagi list of integers ke dalam blok-blok berukuran tetap (misal 128),
-    menentukan jumlah bit (b) yang optimal untuk setiap blok, dan memisahkan
-    nilai-nilai yang tidak muat ke dalam b-bit (exceptions).
+    Algoritma ini membagi list of integers ke dalam blok-blok berukuran tetap (128),
+    menentukan jumlah bit (b) yang optimal secara heuristik untuk setiap blok, 
+    dan memisahkan nilai-nilai yang tidak muat ke dalam b-bit (exceptions).
 
     ASUMSI: 
     1. postings_list untuk sebuah term MUAT di memori!
-    2. Ukuran blok (N) biasanya 128 atau sesuai kebutuhan.
+    2. Ukuran blok (N) adalah 128.
     """
+
+    @staticmethod
+    def encode_opt_block(block):
+        """
+        Encode satu blok menggunakan OptPForDelta.
+
+        Parameters
+        ----------
+        block: List[int]
+            List of gaps
+
+        Returns
+        -------
+        bytes
+            bytearray hasil kompresi OptPForDelta
+        """
+        sorted_block = sorted(block)
+        b = sorted_block[int(0.9 * (len(sorted_block) - 1))].bit_length()
+
+        main_data = []
+        outliers_val = []
+        outliers_idx = []
+        for i, d in enumerate(block):
+            if d < (1 << b):
+                main_data.append(d)
+            else:
+                main_data.append(0) # Placeholder
+                outliers_val.append(d)
+                outliers_idx.append(i)
+
+        header = array.array('B')
+        header.append(b & 0xFF)
+        header.extend(len(block).to_bytes(1, 'big'))
+        header.extend(len(outliers_val).to_bytes(1, 'big'))
+
+        packed_data = array.array('B')
+        current, bits = 0, 0
+        for val in main_data:
+            current = (current << b) | (val & ((1 << b) - 1))
+            bits += b
+            while bits >= 8:
+                bits -= 8
+                packed_data.append((current >> bits) & 0xFF)     
+                current &= (1 << bits) - 1  
+        if bits > 0:
+            packed_data.append((current << (8 - bits)) & 0xFF)
+
+        outlier_stream = VBEPostings.vb_encode(outliers_val) + VBEPostings.vb_encode(outliers_idx)
+
+        return header.tobytes() + packed_data.tobytes() + outlier_stream
+
+    @staticmethod
+    def encode_opt(postings_list):
+        """
+        Encode postings_list atau tf_list ke dalam stream of bytes menggunakan OptPForDelta.
+        Method ini membagi list menjadi blok-blok berukuran tetap (BLOCK_SIZE).
+
+        Parameters
+        ----------
+        postings_list: List[int]
+            List of numbers (bisa berupa gaps atau raw TF)
+
+        Returns
+        -------
+        bytes
+            bytearray hasil kompresi seluruh list
+        """
+        N = OptPForDeltaPostings.BLOCK_SIZE
+        full_steam = bytearray()
+
+        total_postings = len(postings_list)
+        full_steam.extend(total_postings.to_bytes(4, 'big'))
+
+        for i in range(0, total_postings, N):
+            block = postings_list[i:min(i + N, total_postings)]
+            
+            block_bytes = OptPForDeltaPostings.encode_opt_block(block)
+
+            block_len = len(block_bytes)
+            full_steam.extend(block_len.to_bytes(4, 'big'))
+
+            full_steam.extend(block_bytes)
+        
+        return bytes(full_steam)
 
     @staticmethod
     def encode(postings_list):
@@ -258,9 +344,9 @@ class OptPForDeltaPostings:
         1. Ubah docIDs menjadi gap-based (delta-encoding).
         2. Bagi list of gaps menjadi blok-blok (misal per 128 elemen).
         3. Untuk setiap blok:
-           a. Cari nilai 'b' (bit-width) yang optimal dengan mencoba b = [0, 32].
-           b. Tentukan elemen mana yang menjadi 'exception' (> 2^b - 1).
-           c. Simpan b, jumlah exception, data b-bit, dan data exception (misal pakai VBE).
+           a. Cari nilai 'b' (bit-width) menggunakan heuristik quantile (90%).
+           b. Tentukan elemen mana yang menjadi 'exception' (>= 2^b).
+           c. Simpan b, jumlah elemen, jumlah exception, data b-bit, dan data exception (VBE).
         4. Gabungkan semua blok menjadi satu bytearray.
 
         Parameters
@@ -273,8 +359,93 @@ class OptPForDeltaPostings:
         bytes
             bytearray hasil kompresi OptPForDelta
         """
-        # TODO: Implementasi delta encoding dan pemrosesan blok
-        pass
+        gap_postings_list = [postings_list[0]]
+        for i in range(1, len(postings_list)):
+            gap_postings_list.append(postings_list[i] - postings_list[i-1])
+
+        return OptPForDeltaPostings.encode_opt(gap_postings_list)
+
+    @staticmethod
+    def decode_opt_block(block_bytes):
+        """
+        Decode satu blok dari bytearray hasil encode_opt_block.
+
+        Parameters
+        ----------
+        block_bytes: bytes
+            bytearray yang merepresentasikan satu blok kompresi
+
+        Returns
+        -------
+        List[int]
+            List of decoded numbers dalam satu blok
+        """
+        if not block_bytes:
+            return []
+        
+        b = block_bytes[0]
+        N = block_bytes[1]
+        num_exceptions = block_bytes[2]
+        
+        result = []
+        ptr = 3
+        curr_val, bits_left = 0, 0
+        for _ in range(N):
+            val, needed = 0, b
+            while needed > 0:
+                if bits_left == 0:
+                    curr_val = block_bytes[ptr]
+                    ptr += 1
+                    bits_left = 8
+                
+                take = min(needed, bits_left)
+                val = (val << take) | ((curr_val >> (bits_left - take)) & ((1 << take) - 1))
+                bits_left -= take
+                needed -= take
+            
+            result.append(val)
+
+        outliers = VBEPostings.vb_decode(block_bytes[ptr:])
+        for i in range(num_exceptions):
+            result[outliers[i + num_exceptions]] = outliers[i]
+        
+        return result
+
+    @staticmethod
+    def decode_opt(encoded_postings_list):
+        """
+        Decode seluruh bytearray hasil encode_opt kembali menjadi list of numbers.
+
+        Parameters
+        ----------
+        encoded_postings_list: bytes
+            bytearray hasil kompresi encode_opt
+
+        Returns
+        -------
+        List[int]
+            List of numbers (masih berupa gaps atau raw TF)
+        """
+        stream = array.array('B')
+        stream.frombytes(encoded_postings_list)
+        
+        total_postings = int.from_bytes(stream[0:4], 'big')
+
+        ptr = 4
+        decoded_gap_postings_list = []
+        
+        while len(decoded_gap_postings_list) < total_postings:
+            block_len = int.from_bytes(stream[ptr : ptr + 4], 'big')
+            ptr += 4
+
+            block_bytes = stream[ptr : ptr + block_len]
+            ptr += block_len
+
+            decoded_block = OptPForDeltaPostings.decode_opt_block(block_bytes)
+
+            decoded_gap_postings_list.extend(decoded_block)
+
+        return decoded_gap_postings_list
 
     @staticmethod
     def decode(encoded_postings_list):
@@ -284,8 +455,8 @@ class OptPForDeltaPostings:
         Langkah-langkah:
         1. Baca stream of bytes blok demi blok.
         2. Untuk setiap blok:
-           a. Baca header (nilai b dan jumlah exception).
-           b. Unpack b-bit data.
+           a. Baca header (nilai b, jumlah elemen N, dan jumlah exception).
+           b. Unpack b-bit data sebanyak N elemen.
            c. Baca data exception dan 'patch' ke posisi yang sesuai di blok.
         3. Ubah list of gaps kembali menjadi list of docIDs asli (cumulative sum).
 
@@ -299,8 +470,13 @@ class OptPForDeltaPostings:
         List[int]
             List of original docIDs
         """
-        # TODO: Implementasi decoding per blok dan rekonstruksi docIDs
-        pass
+        decoded_gap_postings_list = OptPForDeltaPostings.decode_opt(encoded_postings_list)
+        
+        postings_list = [decoded_gap_postings_list[0]]
+        for i in range(1, len(decoded_gap_postings_list)):
+            postings_list.append(decoded_gap_postings_list[i] + postings_list[i-1])
+        
+        return postings_list
 
     @staticmethod
     def encode_tf(tf_list):
@@ -317,8 +493,7 @@ class OptPForDeltaPostings:
         bytes
             bytearray hasil kompresi OptPForDelta
         """
-        # TODO: Implementasi encode_tf
-        pass
+        return OptPForDeltaPostings.encode_opt(tf_list)
 
     @staticmethod
     def decode_tf(encoded_tf_list):
@@ -335,8 +510,7 @@ class OptPForDeltaPostings:
         List[int]
             List of term frequencies
         """
-        # TODO: Implementasi decode_tf
-    pass
+        return OptPForDeltaPostings.decode_opt(encoded_tf_list)
 
 if __name__ == '__main__':
     
