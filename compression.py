@@ -237,11 +237,112 @@ class VBEPostings:
         """
         return VBEPostings.vb_decode(encoded_tf_list)
 
+class OptPForDeltaPostings:
+    """ 
+    OptPForDelta compression.
+    Algoritma ini membagi list of integers ke dalam blok-blok berukuran tetap (misal 128),
+    menentukan jumlah bit (b) yang optimal untuk setiap blok, dan memisahkan
+    nilai-nilai yang tidak muat ke dalam b-bit (exceptions).
+
+    ASUMSI: 
+    1. postings_list untuk sebuah term MUAT di memori!
+    2. Ukuran blok (N) biasanya 128 atau sesuai kebutuhan.
+    """
+
+    @staticmethod
+    def encode(postings_list):
+        """
+        Encode postings_list menjadi stream of bytes menggunakan OptPForDelta.
+        
+        Langkah-langkah:
+        1. Ubah docIDs menjadi gap-based (delta-encoding).
+        2. Bagi list of gaps menjadi blok-blok (misal per 128 elemen).
+        3. Untuk setiap blok:
+           a. Cari nilai 'b' (bit-width) yang optimal dengan mencoba b = [0, 32].
+           b. Tentukan elemen mana yang menjadi 'exception' (> 2^b - 1).
+           c. Simpan b, jumlah exception, data b-bit, dan data exception (misal pakai VBE).
+        4. Gabungkan semua blok menjadi satu bytearray.
+
+        Parameters
+        ----------
+        postings_list: List[int]
+            List of docIDs (postings)
+
+        Returns
+        -------
+        bytes
+            bytearray hasil kompresi OptPForDelta
+        """
+        # TODO: Implementasi delta encoding dan pemrosesan blok
+        pass
+
+    @staticmethod
+    def decode(encoded_postings_list):
+        """
+        Decode encoded_postings_list dari stream of bytes kembali ke list of docIDs.
+
+        Langkah-langkah:
+        1. Baca stream of bytes blok demi blok.
+        2. Untuk setiap blok:
+           a. Baca header (nilai b dan jumlah exception).
+           b. Unpack b-bit data.
+           c. Baca data exception dan 'patch' ke posisi yang sesuai di blok.
+        3. Ubah list of gaps kembali menjadi list of docIDs asli (cumulative sum).
+
+        Parameters
+        ----------
+        encoded_postings_list: bytes
+            bytearray hasil encode OptPForDelta
+
+        Returns
+        -------
+        List[int]
+            List of original docIDs
+        """
+        # TODO: Implementasi decoding per blok dan rekonstruksi docIDs
+        pass
+
+    @staticmethod
+    def encode_tf(tf_list):
+        """
+        Encode list of term frequencies menjadi stream of bytes menggunakan OptPForDelta.
+        
+        Parameters
+        ----------
+        tf_list: List[int]
+            List of term frequencies
+
+        Returns
+        -------
+        bytes
+            bytearray hasil kompresi OptPForDelta
+        """
+        # TODO: Implementasi encode_tf
+        pass
+
+    @staticmethod
+    def decode_tf(encoded_tf_list):
+        """
+        Decode stream of bytes menjadi list of term frequencies.
+
+        Parameters
+        ----------
+        encoded_tf_list: bytes
+            bytearray hasil encode_tf
+
+        Returns
+        -------
+        List[int]
+            List of term frequencies
+        """
+        # TODO: Implementasi decode_tf
+    pass
+
 if __name__ == '__main__':
     
     postings_list = [34, 67, 89, 454, 2345738]
     tf_list = [12, 10, 3, 4, 1]
-    for Postings in [StandardPostings, VBEPostings]:
+    for Postings in [StandardPostings, VBEPostings, OptPForDeltaPostings]:
         print(Postings.__name__)
         encoded_postings_list = Postings.encode(postings_list)
         encoded_tf_list = Postings.encode_tf(tf_list)
