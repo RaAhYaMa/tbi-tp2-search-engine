@@ -1,4 +1,5 @@
 import re
+import math
 from bsbi import BSBIIndex
 from compression import VBEPostings
 
@@ -23,11 +24,32 @@ def rbp(ranking, p = 0.8):
         score RBP
   """
   score = 0.
-  for i in range(1, len(ranking)):
+  for i in range(1, len(ranking) + 1):
     pos = i - 1
     score += ranking[pos] * (p ** (i - 1))
   return (1 - p) * score
 
+
+def dcg(ranking):
+  score = 0.0
+  for i in range(1, len(ranking) + 1):
+    pos = i - 1
+    score += ranking[pos] / math.log2(i + 1)
+  return score
+
+def ndcg(ranking):
+  dcg_score = dcg(ranking)
+  idcg_score = dcg(sorted(ranking, reverse = True))
+  return dcg_score / idcg_score
+
+def ap(ranking):
+  score = 0.0
+  current_precision = 0.0
+  for i in range(1, len(ranking) + 1):
+    pos = i - 1
+    current_precision = current_precision + (ranking[pos] - current_precision) / i # precision at k
+    score += current_precision * ranking[pos]
+  return score / len(ranking)
 
 ######## >>>>> memuat qrels
 
