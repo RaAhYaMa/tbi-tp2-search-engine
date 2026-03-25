@@ -1,5 +1,6 @@
 import re
 import math
+import argparse
 from bsbi import BSBIIndex
 from compression import VBEPostings
 
@@ -75,7 +76,7 @@ def load_qrels(qrel_file = "qrels.txt", max_q_id = 30, max_doc_id = 1033):
 
 ######## >>>>> EVALUASI !
 
-def eval(qrels, query_file = "queries.txt", k = 1000):
+def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 'tfidf'):
   """ 
     loop ke semua 30 query, hitung score di setiap query,
     lalu hitung MEAN SCORE over those 30 queries.
@@ -86,7 +87,7 @@ def eval(qrels, query_file = "queries.txt", k = 1000):
                           output_dir = 'index')
 
   with open(query_file) as file:
-    rbp_scores = []
+    scores = []
     for qline in file:
       parts = qline.strip().split()
       qid = parts[0]
@@ -95,18 +96,40 @@ def eval(qrels, query_file = "queries.txt", k = 1000):
       # HATI-HATI, doc id saat indexing bisa jadi berbeda dengan doc id
       # yang tertera di qrels
       ranking = []
-      for (score, doc) in BSBI_instance.retrieve_tfidf(query, k = k):
+      if scoring.lower() == 'tfidf':
+        results = BSBI_instance.retrieve_tfidf(query, k = k)
+      elif scoring.lower() == 'bm25':
+        results = BSBI_instance.retrieve_bm25(query, k = k)
+      else:
+        raise ValueError("Scoring method tidak dikenal")
+
+      for (score, doc) in results:
           did = int(re.search(r'\/.*\/.*\/(.*)\.txt', doc).group(1))
           ranking.append(qrels[qid][did])
-      rbp_scores.append(rbp(ranking))
+      
+      if metric.upper() == 'RBP':
+        scores.append(rbp(ranking))
+      elif metric.upper() == 'DCG':
+        scores.append(dcg(ranking))
+      elif metric.upper() == 'NDCG':
+        scores.append(ndcg(ranking))
+      elif metric.upper() == 'AP':
+        scores.append(ap(ranking))
+      else:
+        raise ValueError("Metric tidak dikenal")
 
-  print("Hasil evaluasi TF-IDF terhadap 30 queries")
-  print("RBP score =", sum(rbp_scores) / len(rbp_scores))
+  print(f"Hasil evaluasi {scoring.upper()} dengan metric {metric.upper()} terhadap 30 queries")
+  print(f"Mean {metric.upper()} score =", sum(scores) / len(scores))
 
 if __name__ == '__main__':
+  parser = argparse.ArgumentParser(description='Evaluasi Search Engine')
+  parser.add_argument('--metric', choices=['RBP', 'DCG', 'NDCG', 'AP'], default='RBP', help='Pilihan evaluasi (RBP, DCG, NDCG, AP)')
+  parser.add_argument('--scoring', choices=['tfidf', 'bm25'], default='tfidf', help='Scoring method (tfidf, bm25)')
+  args = parser.parse_args()
+
   qrels = load_qrels()
 
   assert qrels["Q1"][166] == 1, "qrels salah"
   assert qrels["Q1"][300] == 0, "qrels salah"
 
-  eval(qrels)
+  eval(qrels, metric=args.metric, scoring=args.scoring)
