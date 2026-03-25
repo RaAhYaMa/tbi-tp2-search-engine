@@ -252,7 +252,7 @@ class BSBIIndex:
                         
                         dl = merged_index.doc_length[doc_id]
 
-                        tf_weight = ((k + 1) * tf) / (k1 * ((1 - b) * b * dl / avdl) + tf)
+                        tf_weight = ((k1 + 1) * tf) / (k1 * ((1 - b) + b * dl / avdl) + tf)
                         
                         scores[doc_id] += idf * tf_weight
 
@@ -260,8 +260,84 @@ class BSBIIndex:
             docs = [(score, self.doc_id_map[doc_id])
                     for (doc_id, score) in scores.items()]
 
-            return sorted(docs, key = lambda x: x[0], reverse = True)[:k]
+            return sorted(docs, key = lambda x: (x[0], x[1]), reverse = True)[:k]
     
+    def retrieve_bm25_wand(self, query, k = 10, k1 = 1.6, b = 0.75):
+        if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
+            self.load()
+
+        terms = [self.term_id_map[word] 
+                for word in query.split() 
+                if word in self.term_id_map]
+
+        with InvertedIndexReader(self.index_name,
+                                self.postings_encoding,
+                                directory=self.output_dir) as merged_index:
+            N = len(merged_index.doc_length)
+            avdl = merged_index.avg_doc_length
+            
+            term_data = []
+            min_dl = min(merged_index.doc_length.values())
+            for term in terms:
+                if term in merged_index.postings_dict:
+                    data = merged_index.postings_dict[term]
+                    max_tf = data[4]
+                    df = data[1]
+                    idf = math.log(N / df)
+
+                    # Untuk dl, loosely pakai dl terpendek dari seluruh dokumen
+                    ut = idf * ((k1 + 1) * max_tf) / (k1 * ((1 - b) + b * min_dl / avdl) + max_tf)
+
+                    postings, tf_list = merged_index.get_postings_list(term)
+                    p_length = len(postings)
+                    postings.append(-1) # Menandakan last_id
+                    term_data.append({'p': postings, 'tf': tf_list, 'idx': 0, 'ut': ut, 'idf': idf, 'p_len': p_length})
+
+            if not term_data: return []
+
+            top_k = [] # Min-heap
+            threshold = 0
+            while True:
+                term_data.sort(key=lambda x: x['p'][x['idx']] if x['idx'] < x['p_len'] else float('inf'))
+
+                score_bound = 0.0
+                pivot_idx = -1
+                for i in range(len(term_data)):
+                    score_bound += term_data[i]['ut']
+                    if score_bound > threshold:
+                        pivot_idx = i
+                        break
+
+                if pivot_idx == -1:
+                    break
+
+                pivot_doc_id = term_data[pivot_idx]['p'][term_data[pivot_idx]['idx']]
+                if pivot_doc_id == -1:
+                    break
+
+                if term_data[0]['p'][term_data[0]['idx']] == pivot_doc_id:
+                    actual_score = 0.0
+                    dl = merged_index.doc_length[pivot_doc_id]
+                    for td in term_data:
+                        if td['idx'] < td['p_len'] and td['p'][td['idx']] == pivot_doc_id:
+                            tf = td['tf'][td['idx']]
+                            tf_weight = ((k1 + 1) * tf) / (k1 * ((1 - b) + b * dl / avdl) + tf)
+                            actual_score += td['idf'] * tf_weight
+                            td['idx'] += 1
+                    
+                    if len(top_k) < k:
+                        heapq.heappush(top_k, (actual_score, self.doc_id_map[pivot_doc_id]))
+                    elif actual_score > top_k[0][0]:
+                        heapq.heapreplace(top_k, (actual_score, self.doc_id_map[pivot_doc_id]))
+
+                    threshold = top_k[0][0] if len(top_k) == k else 0
+                else:
+                    it = term_data[0]
+                    while it['idx'] < it['p_len'] and it['p'][it['idx']] < pivot_doc_id:
+                        it['idx'] += 1
+
+        return sorted(top_k, key=lambda x: (x[0], x[1]), reverse=True)
+
     def index(self):
         """
         Base indexing code

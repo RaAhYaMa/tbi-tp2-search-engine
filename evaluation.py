@@ -100,6 +100,8 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
         results = BSBI_instance.retrieve_tfidf(query, k = k)
       elif scoring.lower() == 'bm25':
         results = BSBI_instance.retrieve_bm25(query, k = k)
+      elif scoring.lower() == 'bm25_wand':
+        results = BSBI_instance.retrieve_bm25_wand(query, k = k)
       else:
         raise ValueError("Scoring method tidak dikenal")
 
@@ -124,7 +126,7 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Evaluasi Search Engine')
   parser.add_argument('--metric', choices=['RBP', 'DCG', 'NDCG', 'AP'], default='RBP', help='Pilihan evaluasi (RBP, DCG, NDCG, AP)')
-  parser.add_argument('--scoring', choices=['tfidf', 'bm25'], default='tfidf', help='Scoring method (tfidf, bm25)')
+  parser.add_argument('--scoring', choices=['tfidf', 'bm25', 'bm25_wand'], default='tfidf', help='Scoring method (tfidf, bm25, bm25_wand)')
   args = parser.parse_args()
 
   qrels = load_qrels()
