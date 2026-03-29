@@ -1,3 +1,4 @@
+import os
 import re
 import math
 import argparse
@@ -106,7 +107,14 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
         raise ValueError("Scoring method tidak dikenal")
 
       for (score, doc) in results:
-          did = int(re.search(r'\/.*\/.*\/(.*)\.txt', doc).group(1))
+          # doc is a path like 'collection/0/123.txt' or './collection/0/123.txt'
+          # we want to extract the '123' part
+          match = re.search(r'(\d+)\.txt$', doc)
+          if match:
+              did = int(match.group(1))
+          else:
+              # Fallback if the filename is not just digits
+              did = int(os.path.splitext(os.path.basename(doc))[0])
           ranking.append(qrels[qid][did])
       
       if metric.upper() == 'RBP':
