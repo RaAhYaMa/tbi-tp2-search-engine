@@ -6,6 +6,7 @@ import math
 
 from index import InvertedIndexReader, InvertedIndexWriter
 from util import IdMap, sorted_merge_posts_and_tfs
+from scoring import BM25Scorer, TFIDFScorer
 
 class BaseIndex:
     """
@@ -61,6 +62,7 @@ class BaseIndex:
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
+        scorer = TFIDFScorer()
         terms = [self.term_id_map[word] for word in query.split() if word in self.term_id_map]
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
             scores = {}
@@ -68,13 +70,13 @@ class BaseIndex:
                 if term in merged_index.postings_dict:
                     df = merged_index.postings_dict[term][1]
                     N = len(merged_index.doc_length)
+                    idf = scorer.idf(N, df)
                     postings, tf_list = merged_index.get_postings_list(term)
                     for i in range(len(postings)):
                         doc_id, tf = postings[i], tf_list[i]
                         if doc_id not in scores:
                             scores[doc_id] = 0
-                        if tf > 0:
-                            scores[doc_id] += math.log(N / df) * (1 + math.log(tf))
+                        scores[doc_id] += scorer.score(tf, idf)
 
             docs = [(score, self.doc_id_map[doc_id]) for (doc_id, score) in scores.items()]
             return sorted(docs, key=lambda x: x[0], reverse=True)[:k]
@@ -83,6 +85,7 @@ class BaseIndex:
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
+        scorer = BM25Scorer(k1=k1, b=b)
         terms = [self.term_id_map[word] for word in query.split() if word in self.term_id_map]
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
             scores = {}
@@ -92,15 +95,14 @@ class BaseIndex:
             for term in terms:
                 if term in merged_index.postings_dict:
                     df = merged_index.postings_dict[term][1]
-                    idf = math.log(N / df)
+                    idf = scorer.idf(N, df)
                     postings, tf_list = merged_index.get_postings_list(term)
                     for i in range(len(postings)):
                         doc_id, tf = postings[i], tf_list[i]
                         if doc_id not in scores:
                             scores[doc_id] = 0
                         dl = merged_index.doc_length[doc_id]
-                        tf_weight = ((k1 + 1) * tf) / (k1 * ((1 - b) + b * dl / avdl) + tf)
-                        scores[doc_id] += idf * tf_weight
+                        scores[doc_id] += scorer.score(tf, idf, dl, avdl)
 
             docs = [(score, self.doc_id_map[doc_id]) for (doc_id, score) in scores.items()]
             return sorted(docs, key=lambda x: (x[0], x[1]), reverse=True)[:k]
@@ -109,6 +111,7 @@ class BaseIndex:
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
+        scorer = BM25Scorer(k1=k1, b=b)
         terms = [self.term_id_map[word] for word in query.split() if word in self.term_id_map]
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
             N = len(merged_index.doc_length)
@@ -121,8 +124,8 @@ class BaseIndex:
                     data = merged_index.postings_dict[term]
                     max_tf = data[4]
                     df = data[1]
-                    idf = math.log(N / df)
-                    ut = idf * ((k1 + 1) * max_tf) / (k1 * ((1 - b) + b * min_dl / avdl) + max_tf)
+                    idf = scorer.idf(N, df)
+                    ut = scorer.upper_bound(max_tf, idf, min_dl, avdl)
                     postings, tf_list = merged_index.get_postings_list(term)
                     p_length = len(postings)
                     postings.append(-1) 
@@ -151,8 +154,7 @@ class BaseIndex:
                     for td in term_data:
                         if td['idx'] < td['p_len'] and td['p'][td['idx']] == pivot_doc_id:
                             tf = td['tf'][td['idx']]
-                            tf_weight = ((k1 + 1) * tf) / (k1 * ((1 - b) + b * dl / avdl) + tf)
-                            actual_score += td['idf'] * tf_weight
+                            actual_score += scorer.score(tf, td['idf'], dl, avdl)
                             td['idx'] += 1
                     if len(top_k) < k:
                         heapq.heappush(top_k, (actual_score, self.doc_id_map[pivot_doc_id]))
