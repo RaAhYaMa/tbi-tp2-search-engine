@@ -1,1 +1,5 @@
 tqdm==4.67.3
+scipy
+faiss-cpu
+scikit-learn
+numpy
