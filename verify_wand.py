@@ -1,11 +1,11 @@
 import sys
 import time
-from bsbi import BSBIIndex
+from base_index import BaseIndex
 from compression import VBEPostings
 
 def verify():
     # Inisialisasi index
-    bsbi = BSBIIndex(data_dir='collection', 
+    bsbi = BaseIndex(data_dir='collection', 
                      postings_encoding=VBEPostings, 
                      output_dir='index')
     

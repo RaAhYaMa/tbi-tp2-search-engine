@@ -2,7 +2,7 @@ import os
 import re
 import math
 import argparse
-from bsbi import BSBIIndex
+from base_index import BaseIndex
 from compression import VBEPostings
 
 ######## >>>>> sebuah IR metric: RBP p = 0.8
@@ -83,7 +83,7 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
     lalu hitung MEAN SCORE over those 30 queries.
     untuk setiap query, kembalikan top-1000 documents
   """
-  BSBI_instance = BSBIIndex(data_dir = 'collection', \
+  index_instance = BaseIndex(data_dir = 'collection', \
                           postings_encoding = VBEPostings, \
                           output_dir = 'index')
 
@@ -98,11 +98,11 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
       # yang tertera di qrels
       ranking = []
       if scoring.lower() == 'tfidf':
-        results = BSBI_instance.retrieve_tfidf(query, k = k)
+        results = index_instance.retrieve_tfidf(query, k = k)
       elif scoring.lower() == 'bm25':
-        results = BSBI_instance.retrieve_bm25(query, k = k)
+        results = index_instance.retrieve_bm25(query, k = k)
       elif scoring.lower() == 'bm25_wand':
-        results = BSBI_instance.retrieve_bm25_wand(query, k = k)
+        results = index_instance.retrieve_bm25_wand(query, k = k)
       else:
         raise ValueError("Scoring method tidak dikenal")
 

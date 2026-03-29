@@ -1,9 +1,9 @@
-from bsbi import BSBIIndex
+from base_index import BaseIndex
 from compression import VBEPostings
 
 # sebelumnya sudah dilakukan indexing
-# BSBIIndex hanya sebagai abstraksi untuk index tersebut
-BSBI_instance = BSBIIndex(data_dir = 'collection', \
+# BaseIndex hanya sebagai abstraksi untuk index tersebut
+index_instance = BaseIndex(data_dir = 'collection', \
                           postings_encoding = VBEPostings, \
                           output_dir = 'index')
 
@@ -14,6 +14,6 @@ queries = ["alkylated with radioactive iodoacetate", \
 for query in queries:
     print("Query  : ", query)
     print("Results:")
-    for (score, doc) in BSBI_instance.retrieve_tfidf(query, k = 10):
+    for (score, doc) in index_instance.retrieve_tfidf(query, k = 10):
         print(f"{doc:30} {score:>.3f}")
     print()
