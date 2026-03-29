@@ -1,3 +1,42 @@
+class TrieNode:
+    """Node untuk struktur data Trie."""
+    def __init__(self):
+        self.children = {}
+        self.id = -1
+
+class Trie:
+    """Implementasi Trie untuk pemetaan string ke integer ID."""
+    def __init__(self):
+        self.root = TrieNode()
+
+    def __getitem__(self, key):
+        """Mengambil ID dari kata. Mengembalikan -1 jika tidak ditemukan."""
+        node = self.root
+        for char in key:
+            if char not in node.children:
+                raise KeyError(key)
+            node = node.children[char]
+        if node.id == -1:
+            raise KeyError(key)
+        return node.id
+
+    def __setitem__(self, key, value):
+        """Memasukkan kata ke dalam Trie dan mengasosiasikannya dengan sebuah ID."""
+        node = self.root
+        for char in key:
+            if char not in node.children:
+                node.children[char] = TrieNode()
+            node = node.children[char]
+        node.id = value
+
+    def __contains__(self, key):
+        node = self.root
+        for char in key:
+            if char not in node.children:
+                return False
+            node = node.children[char]
+        return node.id != -1
+
 class IdMap:
     """
     Ingat kembali di kuliah, bahwa secara praktis, sebuah dokumen dan
@@ -47,11 +86,6 @@ class IdMap:
         __getitem__(...) adalah special method di Python, yang mengizinkan sebuah
         collection class (seperti IdMap ini) mempunyai mekanisme akses atau
         modifikasi elemen dengan syntax [..] seperti pada list dan dictionary di Python.
-
-        Silakan search informasi ini di Web search engine favorit Anda. Saya mendapatkan
-        link berikut:
-
-        https://stackoverflow.com/questions/43627405/understanding-getitem-method
 
         Jika key adalah integer, gunakan __get_str;
         jika key adalah string, gunakan __get_id
@@ -130,3 +164,4 @@ if __name__ == '__main__':
 
     assert sorted_merge_posts_and_tfs([(1, 34), (3, 2), (4, 23)], \
                                       [(1, 11), (2, 4), (4, 3 ), (6, 13)]) == [(1, 45), (2, 4), (3, 2), (4, 26), (6, 13)], "sorted_merge_posts_and_tfs salah"
+    print("All tests passed!")
