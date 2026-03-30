@@ -3,6 +3,7 @@ import re
 import math
 import argparse
 from base_index import BaseIndex
+from lsi_index import LSIIndex
 from compression import VBEPostings
 
 ######## >>>>> sebuah IR metric: RBP p = 0.8
@@ -83,9 +84,19 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
     lalu hitung MEAN SCORE over those 30 queries.
     untuk setiap query, kembalikan top-1000 documents
   """
-  index_instance = BaseIndex(data_dir = 'collection', \
-                          postings_encoding = VBEPostings, \
-                          output_dir = 'index')
+  if scoring.lower() == 'lsi':
+    index_instance = LSIIndex(data_dir = 'collection', \
+                            postings_encoding = VBEPostings, \
+                            output_dir = 'index')
+    if not os.path.exists(os.path.join('index', 'main_index_lsi.model')):
+      index_instance.build_lsi()
+      index_instance.save_lsi()
+    else:
+      index_instance.load_lsi()
+  else:
+    index_instance = BaseIndex(data_dir = 'collection', \
+                            postings_encoding = VBEPostings, \
+                            output_dir = 'index')
 
   with open(query_file) as file:
     scores = []
@@ -103,6 +114,8 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
         results = index_instance.retrieve_bm25(query, k = k)
       elif scoring.lower() == 'bm25_wand':
         results = index_instance.retrieve_bm25_wand(query, k = k)
+      elif scoring.lower() == 'lsi':
+        results = index_instance.retrieve_lsi(query, k = k)
       else:
         raise ValueError("Scoring method tidak dikenal")
 
@@ -134,7 +147,7 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Evaluasi Search Engine')
   parser.add_argument('--metric', choices=['RBP', 'DCG', 'NDCG', 'AP'], default='RBP', help='Pilihan evaluasi (RBP, DCG, NDCG, AP)')
-  parser.add_argument('--scoring', choices=['tfidf', 'bm25', 'bm25_wand'], default='tfidf', help='Scoring method (tfidf, bm25, bm25_wand)')
+  parser.add_argument('--scoring', choices=['tfidf', 'bm25', 'bm25_wand', 'lsi'], default='tfidf', help='Scoring method (tfidf, bm25, bm25_wand, lsi)')
   args = parser.parse_args()
 
   qrels = load_qrels()
