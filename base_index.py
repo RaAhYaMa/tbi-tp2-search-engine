@@ -5,7 +5,7 @@ import heapq
 import math
 
 from index import InvertedIndexReader, InvertedIndexWriter
-from util import IdMap, sorted_merge_posts_and_tfs
+from util import IdMap, sorted_merge_posts_and_tfs, preprocess
 from scoring import BM25Scorer, TFIDFScorer
 
 class BaseIndex:
@@ -63,7 +63,7 @@ class BaseIndex:
             self.load()
 
         scorer = TFIDFScorer()
-        terms = [self.term_id_map[word] for word in query.split() if word in self.term_id_map]
+        terms = [self.term_id_map[word] for word in preprocess(query) if word in self.term_id_map]
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
             scores = {}
             for term in terms:
@@ -86,7 +86,7 @@ class BaseIndex:
             self.load()
 
         scorer = BM25Scorer(k1=k1, b=b)
-        terms = [self.term_id_map[word] for word in query.split() if word in self.term_id_map]
+        terms = [self.term_id_map[word] for word in preprocess(query) if word in self.term_id_map]
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
             scores = {}
             N = len(merged_index.doc_length)
@@ -112,7 +112,7 @@ class BaseIndex:
             self.load()
 
         scorer = BM25Scorer(k1=k1, b=b)
-        terms = [self.term_id_map[word] for word in query.split() if word in self.term_id_map]
+        terms = [self.term_id_map[word] for word in preprocess(query) if word in self.term_id_map]
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
             N = len(merged_index.doc_length)
             avdl = merged_index.avg_doc_length

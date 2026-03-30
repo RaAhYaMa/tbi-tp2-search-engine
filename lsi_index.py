@@ -8,6 +8,7 @@ from base_index import BaseIndex
 from index import InvertedIndexReader
 from scoring import TFIDFScorer
 from tqdm import tqdm
+from util import preprocess
 
 class LSIIndex(BaseIndex):
     def __init__(self, data_dir, output_dir, postings_encoding, index_name="main_index", verbose=True):
@@ -118,7 +119,7 @@ class LSIIndex(BaseIndex):
             self.load_lsi()
             
         # 1. Representasikan query sebagai vektor sparse TF-IDF
-        query_words = query.split()
+        query_words = preprocess(query)
         q_rows, q_cols, q_data = [], [], []
         
         # Hitung TF lokal untuk query
