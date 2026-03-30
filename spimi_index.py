@@ -9,27 +9,29 @@ from util import preprocess
 
 class SPIMIIndex(BaseIndex):
     """
-    Kelas yang mengimplementasikan Single Pass In-Memory Indexing (SPIMI).
-    Metode ini membangun indeks dengan cara memproses dokumen dan menyimpannya di memori 
-    hingga mencapai ambang batas tertentu sebelum di-flush ke disk sebagai blok intermediate.
+    Class implementing Single Pass In-Memory Indexing (SPIMI).
+    This method builds an index by processing documents and storing them in 
+    memory until a certain threshold is reached before being flushed to disk 
+    as intermediate blocks.
     """
     def __init__(self, data_dir, output_dir, postings_encoding, 
                  memory_threshold_mb=10, index_name="main_index"):
         """
         Args:
-            data_dir (str): Direktori yang berisi koleksi dokumen.
-            output_dir (str): Direktori penyimpanan hasil indeks.
-            postings_encoding (class): Kelas kompresi untuk postings list.
-            memory_threshold_mb (int): Ambang batas penggunaan memori dalam MB (default: 10).
-            index_name (str): Nama dasar indeks.
+            data_dir (str): Directory containing document collection.
+            output_dir (str): Storage directory for index results.
+            postings_encoding (class): Compression class for postings list.
+            memory_threshold_mb (int): Memory usage threshold in MB (default: 10).
+            index_name (str): Base index name.
         """
         super().__init__(data_dir, output_dir, postings_encoding, index_name)
         self.memory_threshold = memory_threshold_mb * 1024 * 1024
 
     def index(self):
         """
-        Memulai proses indexing menggunakan algoritma SPIMI.
-        Melewati seluruh dokumen, membangun kamus term di memori, dan melakukan merging blok.
+        Starts the indexing process using the SPIMI algorithm.
+        Passes through all documents, builds the term dictionary in memory, 
+        and performs block merging.
         """
         self.intermediate_indices = []
         block_id = 0
@@ -76,12 +78,13 @@ class SPIMIIndex(BaseIndex):
 
     def flush_block(self, term_dict, term_tf, block_id):
         """
-        Menulis isi dictionary term di memori ke file indeks intermediate (blok).
+        Writes the contents of the term dictionary in memory to an 
+        intermediate index file (block).
 
         Args:
-            term_dict (dict): Dictionary mapping term_id ke set doc_id.
-            term_tf (dict): Dictionary mapping term_id ke mapping doc_id: freq.
-            block_id (int): Identifier untuk blok yang sedang ditulis.
+            term_dict (dict): Dictionary mapping term_id to a set of doc_ids.
+            term_tf (dict): Dictionary mapping term_id to a mapping of doc_id: freq.
+            block_id (int): Identifier for the block currently being written.
         """
         index_id = f'spimi_block_{block_id}'
         self.intermediate_indices.append(index_id)

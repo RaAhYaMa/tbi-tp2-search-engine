@@ -1,6 +1,6 @@
 """
-Contoh skrip sederhana untuk mendemonstrasikan fungsionalitas pencarian menggunakan TF-IDF.
-Skrip ini mengasumsikan indeks sudah dibangun sebelumnya.
+Simple script example to demonstrate search functionality using TF-IDF.
+This script assumes the index has already been built.
 """
 
 from base_index import BaseIndex
@@ -15,7 +15,7 @@ queries = ["alkylated with radioactive iodoacetate", \
            
 for query in queries:
     print(f"Query  : {query}")
-    print("Hasil  :")
+    print("Results :")
     for (score, doc) in index_instance.retrieve_tfidf(query, k = 10):
         print(f"  {doc:30} {score:>.3f}")
     print()

@@ -2,43 +2,43 @@ import math
 
 class Scorer:
     """
-    Kelas dasar untuk semua pemberi skor (scorer).
-    Menyediakan fungsionalitas umum seperti perhitungan IDF.
+    Base class for all scorers.
+    Provides common functionality such as IDF calculation.
     """
     def idf(self, N, df):
         """
-        Menghitung Inverse Document Frequency (IDF) berbasis logaritma natural.
+        Calculates Inverse Document Frequency (IDF) based on the natural logarithm.
         
         Args:
-            N (int): Total dokumen dalam koleksi.
-            df (int): Document Frequency (jumlah dokumen yang mengandung term tertentu).
+            N (int): Total documents in the collection.
+            df (int): Document Frequency (number of documents containing a specific term).
 
         Returns:
-            float: Nilai IDF.
+            float: IDF value.
         """
         if df <= 0:
             return 0
         return math.log(N / df)
 
     def score(self, *args, **kwargs):
-        """Metode abstrak untuk menghitung skor akhir."""
+        """Abstract method to calculate the final score."""
         raise NotImplementedError
 
 class TFIDFScorer(Scorer):
     """
-    Implementasi skoring TF-IDF.
-    Rumus: idf * (1 + log(tf))
+    TF-IDF scoring implementation.
+    Formula: idf * (1 + log(tf))
     """
     def score(self, tf, idf):
         """
-        Menghitung skor TF-IDF untuk satu term dalam sebuah dokumen.
+        Calculates the TF-IDF score for a single term in a document.
 
         Args:
-            tf (int): Term Frequency dalam dokumen.
-            idf (float): Nilai IDF dari term tersebut.
+            tf (int): Term Frequency in the document.
+            idf (float): IDF value for the term.
 
         Returns:
-            float: Skor TF-IDF.
+            float: TF-IDF score.
         """
         if tf <= 0:
             return 0
@@ -46,29 +46,29 @@ class TFIDFScorer(Scorer):
 
 class BM25Scorer(Scorer):
     """
-    Implementasi skoring BM25.
-    Rumus: idf * ((k1 + 1) * tf) / (k1 * ((1 - b) + b * dl / avdl) + tf)
+    BM25 scoring implementation.
+    Formula: idf * ((k1 + 1) * tf) / (k1 * ((1 - b) + b * dl / avdl) + tf)
     """
     def __init__(self, k1=1.6, b=0.75):
         """
         Args:
-            k1 (float): Parameter saturasi TF (default: 1.6).
-            b (float): Parameter normalisasi panjang dokumen (default: 0.75).
+            k1 (float): TF saturation parameter (default: 1.6).
+            b (float): Document length normalization parameter (default: 0.75).
         """
         self.k1 = k1
         self.b = b
 
     def tf_weight(self, tf, dl, avdl):
         """
-        Menghitung komponen bobot TF pada rumus BM25.
+        Calculates the TF weight component in the BM25 formula.
 
         Args:
             tf (int): Term Frequency.
-            dl (int): Panjang dokumen saat ini (Document Length).
-            avdl (float): Rata-rata panjang dokumen dalam koleksi (Average Document Length).
+            dl (int): Current document length (Document Length).
+            avdl (float): Average document length in the collection (Average Document Length).
 
         Returns:
-            float: Bobot TF hasil normalisasi.
+            float: Normalized TF weight.
         """
         if tf <= 0:
             return 0
@@ -77,30 +77,30 @@ class BM25Scorer(Scorer):
 
     def score(self, tf, idf, dl, avdl):
         """
-        Menghitung skor BM25 lengkap untuk satu term.
+        Calculates the complete BM25 score for a single term.
 
         Args:
             tf (int): Term Frequency.
-            idf (float): Nilai IDF.
-            dl (int): Panjang dokumen.
-            avdl (float): Rata-rata panjang dokumen.
+            idf (float): IDF value.
+            dl (int): Document length.
+            avdl (float): Average document length.
 
         Returns:
-            float: Skor BM25.
+            float: BM25 score.
         """
         return idf * self.tf_weight(tf, dl, avdl)
 
     def upper_bound(self, max_tf, idf, min_dl, avdl):
         """
-        Menghitung batas atas skor (upper bound) untuk optimasi WAND.
+        Calculates the score upper bound for WAND optimization.
 
         Args:
-            max_tf (int): Term Frequency maksimum dari term ini di seluruh koleksi.
-            idf (float): Nilai IDF.
-            min_dl (int): Panjang dokumen minimum untuk term ini (untuk estimasi konservatif).
-            avdl (float): Rata-rata panjang dokumen.
+            max_tf (int): Maximum Term Frequency of this term across the collection.
+            idf (float): IDF value.
+            min_dl (int): Minimum document length for this term (for conservative estimation).
+            avdl (float): Average document length.
 
         Returns:
-            float: Nilai upper bound skoring.
+            float: Scoring upper bound value.
         """
         return idf * self.tf_weight(max_tf, min_dl, avdl)

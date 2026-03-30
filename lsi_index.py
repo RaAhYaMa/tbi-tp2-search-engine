@@ -12,18 +12,18 @@ from util import preprocess
 
 class LSIIndex(BaseIndex):
     """
-    Kelas yang mengimplementasikan pemrosesan LSI (Latent Semantic Indexing).
-    Menggunakan teknik SVD (Singular Value Decomposition) untuk mereduksi dimensi matriks 
-    term-document dan meningkatkan kualitas pencarian semantik.
+    Class implementing LSI (Latent Semantic Indexing) processing.
+    Uses SVD (Singular Value Decomposition) to reduce term-document matrix 
+    dimensions and improve semantic search quality.
     """
     def __init__(self, data_dir, output_dir, postings_encoding, index_name="main_index", verbose=True):
         """
         Args:
-            data_dir (str): Direktori yang berisi koleksi dokumen.
-            output_dir (str): Direktori penyimpanan hasil indeks.
-            postings_encoding (class): Kelas kompresi untuk postings list.
-            index_name (str): Nama dasar indeks.
-            verbose (bool): Menampilkan log progres selama pembangunan indeks.
+            data_dir (str): Directory containing document collection.
+            output_dir (str): Storage directory for index results.
+            postings_encoding (class): Compression class for postings list.
+            index_name (str): Base index name.
+            verbose (bool): Displays progress logs during index construction.
         """
         super().__init__(data_dir, output_dir, postings_encoding, index_name)
         self.u = None
@@ -35,11 +35,11 @@ class LSIIndex(BaseIndex):
 
     def build_lsi(self, k=None):
         """
-        Membangun model LSI (SVD) dan membangun indeks FAISS untuk pencarian vektor cepat.
+        Builds the LSI (SVD) model and FAISS index for fast vector search.
 
         Args:
-            k (int, optional): Jumlah dimensi reduksi (Singular Values). 
-                               Jika None, k akan dihitung otomatis sesuai ukuran koleksi.
+            k (int, optional): Number of reduction dimensions (Singular Values). 
+                               If None, k will be automatically calculated based on the collection size.
         """
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
@@ -92,7 +92,7 @@ class LSIIndex(BaseIndex):
             print("LSI Indexing complete.")
 
     def save_lsi(self):
-        """Menyimpan model LSI dan index FAISS ke disk."""
+        """Saves the LSI model and FAISS index to disk."""
         lsi_data = {
             'u': self.u,
             's': self.s,
@@ -106,7 +106,7 @@ class LSIIndex(BaseIndex):
             print("LSI model and FAISS index saved.")
 
     def load_lsi(self):
-        """Memuat model LSI dan index FAISS dari disk."""
+        """Loads the LSI model and FAISS index from disk."""
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
             
@@ -130,14 +130,14 @@ class LSIIndex(BaseIndex):
 
     def retrieve_lsi(self, query, k=10):
         """
-        Melakukan pencarian menggunakan model LSI dan indeks FAISS berdasarkan nilai Cosine Similarity.
+        Performs search using the LSI model and FAISS index based on Cosine Similarity values.
 
         Args:
-            query (str): Teks query pencarian.
-            k (int): Jumlah dokumen teratas yang ingin dikembalikan.
+            query (str): Search query text.
+            k (int): Number of top documents to return.
 
         Returns:
-            list: List of tuples (score, docID_path) yang terurut menurun berdasarkan skor kemiripan.
+            list: List of (score, docID_path) tuples sorted descending by similarity score.
         """
         if self.faiss_index is None:
             self.load_lsi()

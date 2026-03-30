@@ -9,14 +9,14 @@ from compression import VBEPostings
 
 def rbp(ranking, p = 0.8):
   """ 
-  Menghitung skor Rank Biased Precision (RBP).
+  Calculates the Rank Biased Precision (RBP) score.
 
   Args:
-    ranking (list): List biner [1, 0, ...] yang menunjukkan relevansi dokumen pada tiap peringkat.
-    p (float): Parameter persistensi (default: 0.8).
+    ranking (list): Binary list [1, 0, ...] indicating document relevance at each rank.
+    p (float): Persistence parameter (default: 0.8).
 
   Returns:
-    float: Skor RBP.
+    float: RBP score.
   """
   score = 0.
   for i in range(1, len(ranking) + 1):
@@ -27,13 +27,13 @@ def rbp(ranking, p = 0.8):
 
 def dcg(ranking):
   """
-  Menghitung skor Discounted Cumulative Gain (DCG).
+  Calculates the Discounted Cumulative Gain (DCG) score.
 
   Args:
-    ranking (list): List biner atau nilai relevansi dokumen pada tiap peringkat.
+    ranking (list): Binary list or document relevance values at each rank.
 
   Returns:
-    float: Skor DCG.
+    float: DCG score.
   """
   score = 0.0
   for i in range(1, len(ranking) + 1):
@@ -43,13 +43,13 @@ def dcg(ranking):
 
 def ndcg(ranking):
   """
-  Menghitung skor Normalized Discounted Cumulative Gain (NDCG).
+  Calculates the Normalized Discounted Cumulative Gain (NDCG) score.
 
   Args:
-    ranking (list): List biner atau nilai relevansi dokumen pada tiap peringkat.
+    ranking (list): Binary list or document relevance values at each rank.
 
   Returns:
-    float: Skor NDCG.
+    float: NDCG score.
   """
   dcg_score = dcg(ranking)
   idcg_score = dcg(sorted(ranking, reverse = True))
@@ -57,13 +57,13 @@ def ndcg(ranking):
 
 def ap(ranking):
   """
-  Menghitung skor Average Precision (AP).
+  Calculates the Average Precision (AP) score.
 
   Args:
-    ranking (list): List biner yang menunjukkan relevansi dokumen pada tiap peringkat.
+    ranking (list): Binary list indicating document relevance at each rank.
 
   Returns:
-    float: Skor Average Precision.
+    float: Average Precision score.
   """
   score = 0.0
   current_precision = 0.0
@@ -75,15 +75,15 @@ def ap(ranking):
 
 def load_qrels(qrel_file = "qrels.txt", max_q_id = 30, max_doc_id = 1033):
   """ 
-  Memuat data query relevance judgment (qrels) dari file.
+  Loads query relevance judgment (qrels) data from a file.
 
   Args:
-    qrel_file (str): Path ke file qrels.
-    max_q_id (int): Jumlah maksimum query (default: 30).
-    max_doc_id (int): Jumlah maksimum dokumen (default: 1033).
+    qrel_file (str): Path to the qrels file.
+    max_q_id (int): Maximum number of queries (default: 30).
+    max_doc_id (int): Maximum number of documents (default: 1033).
 
   Returns:
-    dict: Dictionary bersarang qrels[query_id][doc_id] berisi nilai relevansi (0 atau 1).
+    dict: Nested dictionary qrels[query_id][doc_id] containing relevance values (0 or 1).
   """
   qrels = {"Q" + str(i) : {i:0 for i in range(1, max_doc_id + 1)} \
                  for i in range(1, max_q_id + 1)}
@@ -97,15 +97,15 @@ def load_qrels(qrel_file = "qrels.txt", max_q_id = 30, max_doc_id = 1033):
 
 def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 'tfidf'):
   """ 
-  Melakukan evaluasi performa mesin pencari terhadap seluruh query menggunakan metrik tertentu.
-  Menampilkan nilai rata-rata (mean) skor dari semua query.
+  Performs search engine performance evaluation against all queries using a specific metric.
+  Displays the mean score from all queries.
 
   Args:
-    qrels (dict): Data relevance judgment hasil load_qrels.
-    query_file (str): Path ke file yang berisi daftar query.
-    k (int): Jumlah dokumen teratas yang diambil untuk evaluasi (default: 1000).
-    metric (str): Metrik evaluasi yang digunakan ('RBP', 'DCG', 'NDCG', atau 'AP').
-    scoring (str): Metode scoring yang digunakan ('tfidf', 'bm25', 'bm25_wand', atau 'lsi').
+    qrels (dict): Relevance judgment data from load_qrels.
+    query_file (str): Path to the file containing the list of queries.
+    k (int): Number of top documents retrieved for evaluation (default: 1000).
+    metric (str): Evaluation metric used ('RBP', 'DCG', 'NDCG', or 'AP').
+    scoring (str): Scoring method used ('tfidf', 'bm25', 'bm25_wand', or 'lsi').
   """
   if scoring.lower() == 'lsi':
     index_instance = LSIIndex(data_dir = 'collection', \
@@ -134,7 +134,7 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
       elif scoring.lower() == 'lsi':
         results = index_instance.retrieve_lsi(query, k = k)
       else:
-        raise ValueError("Scoring method tidak dikenal")
+        raise ValueError("Unknown scoring method")
 
       for (score, doc) in results:
         match = re.search(r'(\d+)\.txt$', doc)
@@ -153,20 +153,20 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
       elif metric.upper() == 'AP':
         scores.append(ap(ranking))
       else:
-        raise ValueError("Metric tidak dikenal")
+        raise ValueError("Unknown metric")
 
-  print(f"Hasil evaluasi {scoring.upper()} dengan metric {metric.upper()} terhadap 30 queries")
+  print(f"Evaluation results of {scoring.upper()} with {metric.upper()} metric for 30 queries")
   print(f"Mean {metric.upper()} score =", sum(scores) / len(scores))
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description='Evaluasi Search Engine')
-  parser.add_argument('--metric', choices=['RBP', 'DCG', 'NDCG', 'AP'], default='RBP', help='Pilihan evaluasi (RBP, DCG, NDCG, AP)')
+  parser = argparse.ArgumentParser(description='Search Engine Evaluation')
+  parser.add_argument('--metric', choices=['RBP', 'DCG', 'NDCG', 'AP'], default='RBP', help='Evaluation choices (RBP, DCG, NDCG, AP)')
   parser.add_argument('--scoring', choices=['tfidf', 'bm25', 'bm25_wand', 'lsi'], default='tfidf', help='Scoring method (tfidf, bm25, bm25_wand, lsi)')
   args = parser.parse_args()
 
   qrels = load_qrels()
 
-  assert qrels["Q1"][166] == 1, "qrels salah"
-  assert qrels["Q1"][300] == 0, "qrels salah"
+  assert qrels["Q1"][166] == 1, "incorrect qrels"
+  assert qrels["Q1"][300] == 0, "incorrect qrels"
 
   eval(qrels, metric=args.metric, scoring=args.scoring)

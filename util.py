@@ -12,22 +12,22 @@ english_stopwords = set(stopwords.words('english'))
 
 def preprocess(text):
     """
-    Melakukan normalisasi teks, tokenisasi (hanya karakter alfanumerik), 
-    penghapusan stopword, dan stemming (Porter Stemmer).
+    Performs text normalization, tokenization (alphanumeric characters only), 
+    stopword removal, and stemming (Porter Stemmer).
 
     Args:
-        text (str): Teks mentah yang akan diproses.
+        text (str): Raw text to be processed.
 
     Returns:
-        list: Daftar token yang sudah diproses.
+        list: List of processed tokens.
     """
     tokens = re.findall(r'\b\w+\b', text.lower())
     return [stemmer.stem(token) for token in tokens if token not in english_stopwords]
 
 class TrieNode:
     """
-    Node untuk struktur data Trie.
-    Menyimpan anak (children) dalam bentuk dictionary dan ID jika node tersebut adalah akhir kata.
+    Node for the Trie data structure.
+    Stores children in a dictionary and an ID if the node is the end of a word.
     """
     def __init__(self):
         self.children = {}
@@ -35,24 +35,24 @@ class TrieNode:
 
 class Trie:
     """
-    Implementasi struktur data Trie untuk pemetaan string ke integer ID secara efisien.
-    Sangat berguna untuk menangani kamus term yang besar.
+    Implementation of the Trie data structure for efficient string-to-integer 
+    ID mapping. Very useful for handling large term dictionaries.
     """
     def __init__(self):
         self.root = TrieNode()
 
     def __getitem__(self, key):
         """
-        Mencari kata dalam Trie dan mengembalikan ID-nya.
+        Searches for a word in the Trie and returns its ID.
         
         Args:
-            key (str): Kata yang akan dicari.
+            key (str): The word to search for.
 
         Returns:
-            int: ID yang terasosiasi dengan kata tersebut.
+            int: The ID associated with the word.
 
         Raises:
-            KeyError: Jika kata tidak ditemukan dalam Trie.
+            KeyError: If the word is not found in the Trie.
         """
         node = self.root
         for char in key:
@@ -65,11 +65,11 @@ class Trie:
 
     def __setitem__(self, key, value):
         """
-        Memasukkan kata baru ke dalam Trie atau memperbarui ID-nya.
+        Inserts a new word into the Trie or updates its ID.
 
         Args:
-            key (str): Kata yang akan dimasukkan.
-            value (int): ID yang ingin diasosiasikan.
+            key (str): The word to be inserted.
+            value (int): The ID to be associated.
         """
         node = self.root
         for char in key:
@@ -79,7 +79,7 @@ class Trie:
         node.id = value
 
     def __contains__(self, key):
-        """Mengecek apakah suatu kata ada di dalam Trie."""
+        """Checks if a word exists in the Trie."""
         node = self.root
         for char in key:
             if char not in node.children:
@@ -89,38 +89,40 @@ class Trie:
 
 class IdMap:
     """
-    Kelas untuk mengelola pemetaan dua arah antara string (term atau dokumen) dan integer ID.
-    Menggunakan Trie untuk pencarian string-ke-ID yang cepat dan List untuk ID-ke-string.
+    Class for managing two-way mapping between strings (terms or documents) 
+    and integer IDs. Uses Trie for fast string-to-ID lookup and a list for 
+    ID-to-string lookup.
     """
 
     def __init__(self):
         """
-        Inisialisasi IdMap dengan Trie untuk str_to_id dan List untuk id_to_str.
+        Initializes IdMap with a Trie for str_to_id and a list for id_to_str.
 
-        Contoh:
-            str_to_id["halo"] ---> 8
-            id_to_str[8] ---> "halo"
+        Example:
+            str_to_id["hello"] ---> 8
+            id_to_str[8] ---> "hello"
         """
         self.str_to_id = Trie()
         self.id_to_str = []
 
     def __len__(self):
-        """Mengembalikan jumlah total elemen yang dipetakan."""
+        """Returns the total number of mapped elements."""
         return len(self.id_to_str)
 
     def __get_str(self, i):
-        """Mengambil string berdasarkan ID (index)."""
+        """Retrieves the string based on ID (index)."""
         return self.id_to_str[i]
 
     def __get_id(self, s):
         """
-        Mengambil ID berdasarkan string. Jika string belum ada, ID baru akan di-assign.
+        Retrieves the ID based on the string. If the string doesn't exist, 
+        a new ID will be assigned.
 
         Args:
-            s (str): String yang ingin dicari ID-nya.
+            s (str): The string to find the ID for.
 
         Returns:
-            int: ID yang unik untuk string tersebut.
+            int: The unique ID for the string.
         """
         if s not in self.str_to_id:
             self.id_to_str.append(s)
@@ -129,32 +131,32 @@ class IdMap:
 
     def __getitem__(self, key):
         """
-        Memungkinkan akses menggunakan bracket [..]. 
-        Mendukung pencarian dua arah berdasarkan tipe input (int atau str).
+        Allows access using brackets [..]. 
+        Supports two-way lookup based on input type (int or str).
         """
         if type(key) is int:
             return self.__get_str(key)
         elif type(key) is str:
             return self.__get_id(key)
         else:
-            raise TypeError("Key harus berupa int (untuk ID) atau str (untuk Term/Dokumen)")
+            raise TypeError("Key must be an int (for ID) or str (for Term/Document)")
 
 def sorted_merge_posts_and_tfs(posts_tfs1, posts_tfs2):
     """
-    Menggabungkan (merge) dua list (doc_id, tf) yang sudah terurut menjadi satu list terurut.
-    Akumulasi TF dilakukan jika terdapat doc_id yang sama pada kedua list.
+    Merges two sorted lists of (doc_id, tf) into a single sorted list.
+    TF accumulation is performed if the same doc_id exists in both lists.
 
-    Contoh: 
+    Example: 
         L1 = [(1, 34), (3, 2)]
         L2 = [(1, 11), (2, 4)]
-        Hasil = [(1, 45), (2, 4), (3, 2)]
+        Result = [(1, 45), (2, 4), (3, 2)]
 
     Args:
-        posts_tfs1 (list): List tuple (doc_id, tf) pertama yang sudah terurut.
-        posts_tfs2 (list): List tuple (doc_id, tf) kedua yang sudah terurut.
+        posts_tfs1 (list): First sorted list of (doc_id, tf) tuples.
+        posts_tfs2 (list): Second sorted list of (doc_id, tf) tuples.
 
     Returns:
-        list: Hasil penggabungan yang sudah terurut berdasarkan doc_id.
+        list: The resulting sorted list merged by doc_id.
     """
     i, j = 0, 0
     merge = []
@@ -186,18 +188,18 @@ if __name__ == '__main__':
 
     doc = ["halo", "semua", "selamat", "pagi", "semua"]
     term_id_map = IdMap()
-    assert [term_id_map[term] for term in doc] == [0, 1, 2, 3, 1], "term_id salah"
-    assert term_id_map[1] == "semua", "term_id salah"
-    assert term_id_map[0] == "halo", "term_id salah"
-    assert term_id_map["selamat"] == 2, "term_id salah"
-    assert term_id_map["pagi"] == 3, "term_id salah"
+    assert [term_id_map[term] for term in doc] == [0, 1, 2, 3, 1], "incorrect term_id"
+    assert term_id_map[1] == "semua", "incorrect term_id"
+    assert term_id_map[0] == "halo", "incorrect term_id"
+    assert term_id_map["selamat"] == 2, "incorrect term_id"
+    assert term_id_map["pagi"] == 3, "incorrect term_id"
 
     docs = ["/collection/0/data0.txt",
             "/collection/0/data10.txt",
             "/collection/1/data53.txt"]
     doc_id_map = IdMap()
-    assert [doc_id_map[docname] for docname in docs] == [0, 1, 2], "docs_id salah"
+    assert [doc_id_map[docname] for docname in docs] == [0, 1, 2], "incorrect docs_id"
 
     assert sorted_merge_posts_and_tfs([(1, 34), (3, 2), (4, 23)], \
-                                      [(1, 11), (2, 4), (4, 3 ), (6, 13)]) == [(1, 45), (2, 4), (3, 2), (4, 26), (6, 13)], "sorted_merge_posts_and_tfs salah"
+                                      [(1, 11), (2, 4), (4, 3 ), (6, 13)]) == [(1, 45), (2, 4), (3, 2), (4, 26), (6, 13)], "incorrect sorted_merge_posts_and_tfs"
     print("All tests passed!")

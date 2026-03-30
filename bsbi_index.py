@@ -8,19 +8,19 @@ from util import preprocess
 
 class BSBIIndex(BaseIndex):
     """
-    Implementasi algoritma Blocked Sort-Based Indexing (BSBI).
-    Membagi koleksi dokumen ke dalam blok-blok berdasarkan sub-direktori untuk 
-    memudahkan proses indexing pada memori yang terbatas.
+    Implementation of the Blocked Sort-Based Indexing (BSBI) algorithm.
+    Divides the document collection into blocks based on sub-directories to 
+    facilitate the indexing process on limited memory.
     """
     def parse_block(self, block_dir_relative):
         """
-        Membaca blok (sub-direktori) dan mengekstrak pasangan (term_id, doc_id).
+        Reads a block (sub-directory) and extracts (term_id, doc_id) pairs.
 
         Args:
-            block_dir_relative (str): Path relatif sub-direktori blok di dalam data_dir.
+            block_dir_relative (str): Relative path of the block sub-directory within data_dir.
 
         Returns:
-            list: List of tuple (term_id, doc_id) dari semua dokumen dalam blok tersebut.
+            list: List of (term_id, doc_id) tuples from all documents in the block.
         """
         dir_path = os.path.join(self.data_dir, block_dir_relative)
         td_pairs = []
@@ -33,11 +33,11 @@ class BSBIIndex(BaseIndex):
 
     def invert_write(self, td_pairs, index):
         """
-        Melakukan inversi pada pasangan term-document dan menuliskannya ke indeks.
+        Performs inversion on term-document pairs and writes them to the index.
 
         Args:
-            td_pairs (list): List of tuple (term_id, doc_id).
-            index (InvertedIndexWriter): Objek writer untuk menulis hasil data yang dibalik.
+            td_pairs (list): List of (term_id, doc_id) tuples.
+            index (InvertedIndexWriter): Writer object to write the inverted data results.
         """
         term_dict = {}
         term_tf = {}
@@ -55,9 +55,9 @@ class BSBIIndex(BaseIndex):
 
     def index(self):
         """
-        Menjalankan seluruh proses pembuatan indeks BSBI.
-        Proses ini mencakup pembacaan blok, pembuatan indeks antara, penyimpanan Kamus (Dictionary),
-        dan penggabungan (merging) indeks antara menjadi indeks akhir.
+        Executes the entire BSBI index creation process.
+        This process covers reading blocks, creating intermediate indices, saving the Dictionary,
+        and merging intermediate indices into the final index.
         """
         self.intermediate_indices = []
         for block_dir_relative in tqdm(sorted(next(os.walk(self.data_dir))[1])):

@@ -1,6 +1,6 @@
 """
-Antarmuka baris perintah (CLI) untuk melakukan pencarian pada sistem temu balik informasi.
-Mendukung berbagai metode scoring seperti TF-IDF, BM25, WAND, dan LSI.
+Command line interface (CLI) for performing searches in the information retrieval system.
+Supports various scoring methods such as TF-IDF, BM25, WAND, and LSI.
 """
 
 import argparse
@@ -11,20 +11,20 @@ from lsi_index import LSIIndex
 
 def main():
     """ 
-    Fungsi utama untuk menangani argumen baris perintah dan menampilkan hasil pencarian.
-    Dapat menerima query tunggal atau daftar query dari sebuah file.
+    Main function to handle command line arguments and display search results.
+    Can accept a single query or a list of queries from a file.
     """
-    parser = argparse.ArgumentParser(description="Antarmuka Pencarian (Search CLI) untuk Sistem Temu Balik Informasi.")
+    parser = argparse.ArgumentParser(description="Search CLI for Information Retrieval System.")
     
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("query", nargs="?", help="Teks query pencarian.")
-    group.add_argument("--file", "-f", help="Path ke file yang berisi daftar query (satu per baris).")
+    group.add_argument("query", nargs="?", help="Search query text.")
+    group.add_argument("--file", "-f", help="Path to the file containing the list of queries (one per line).")
     
-    parser.add_argument("-k", type=int, default=10, help="Jumlah hasil yang ingin dikembalikan (default: 10).")
+    parser.add_argument("-k", type=int, default=10, help="Number of results to return (default: 10).")
     parser.add_argument("--method", "-m", choices=["tfidf", "bm25", "bm25_wand", "lsi"], default="tfidf",
-                        help="Metode skoring yang digunakan (default: tfidf).")
-    parser.add_argument("--data_dir", default="collection", help="Direktori koleksi dokumen (default: 'collection').")
-    parser.add_argument("--output_dir", default="index", help="Direktori penyimpanan indeks (default: 'index').")
+                        help="Scoring method used (default: tfidf).")
+    parser.add_argument("--data_dir", default="collection", help="Document collection directory (default: 'collection').")
+    parser.add_argument("--output_dir", default="index", help="Index storage directory (default: 'index').")
 
     args = parser.parse_args()
 
@@ -42,15 +42,15 @@ def main():
             with open(args.file, 'r') as f:
                 queries = [line.strip() for line in f if line.strip()]
         except FileNotFoundError:
-            print(f"Error: File '{args.file}' tidak ditemukan.")
+            print(f"Error: File '{args.file}' not found.")
             sys.exit(1)
     else:
         queries = [args.query]
  
     for query in queries:
         print(f"Query  : {query}")
-        print(f"Metode : {args.method}")
-        print("Hasil  :")
+        print(f"Method : {args.method}")
+        print("Results :")
         
         if args.method == "tfidf":
             results = index_instance.retrieve_tfidf(query, k=args.k)
@@ -64,7 +64,7 @@ def main():
             results = []
  
         if not results:
-            print("  Tidak ada hasil yang ditemukan.")
+            print("  No results found.")
         else:
             for score, doc in results:
                 print(f"  {doc:30} {score:>.3f}")
