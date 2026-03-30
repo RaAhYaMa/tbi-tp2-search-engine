@@ -102,14 +102,25 @@ class LSIIndex(BaseIndex):
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
             
-        with open(os.path.join(self.output_dir, self.index_name + '_lsi.model'), 'rb') as f:
+        model_path = os.path.join(self.output_dir, self.index_name + '_lsi.model')
+        faiss_path = os.path.join(self.output_dir, self.index_name + '_lsi.faiss')
+        
+        if not os.path.exists(model_path) or not os.path.exists(faiss_path):
+            if self.verbose:
+                print("LSI model file or FAISS index not found. Building LSI index first...")
+            self.build_lsi()
+            self.save_lsi()
+            return
+
+        with open(model_path, 'rb') as f:
             lsi_data = pickle.load(f)
             self.u = lsi_data['u']
             self.s = lsi_data['s']
             self.k = lsi_data['k']
             
-        self.faiss_index = faiss.read_index(os.path.join(self.output_dir, self.index_name + '_lsi.faiss'))
-        # print("LSI model and FAISS index loaded.")
+        self.faiss_index = faiss.read_index(faiss_path)
+        # if self.verbose:
+        #     print("LSI model and FAISS index loaded.")
 
     def retrieve_lsi(self, query, k=10):
         """
@@ -173,9 +184,4 @@ if __name__ == "__main__":
     # Contoh penggunaan
     lsi_idx = LSIIndex(data_dir='collection', output_dir='index', postings_encoding=VBEPostings)
     
-    # Hanya bangun jika belum ada, atau paksa bangun
-    if not os.path.exists(os.path.join('index', 'main_index_lsi.model')):
-        lsi_idx.build_lsi()
-        lsi_idx.save_lsi()
-    else:
-        lsi_idx.load_lsi()
+    lsi_idx.load_lsi()

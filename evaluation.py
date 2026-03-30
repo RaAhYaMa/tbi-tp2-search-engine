@@ -88,11 +88,7 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
     index_instance = LSIIndex(data_dir = 'collection', \
                             postings_encoding = VBEPostings, \
                             output_dir = 'index')
-    if not os.path.exists(os.path.join('index', 'main_index_lsi.model')):
-      index_instance.build_lsi()
-      index_instance.save_lsi()
-    else:
-      index_instance.load_lsi()
+    index_instance.load_lsi()
   else:
     index_instance = BaseIndex(data_dir = 'collection', \
                             postings_encoding = VBEPostings, \
