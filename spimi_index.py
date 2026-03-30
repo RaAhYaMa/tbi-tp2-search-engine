@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 from base_index import BaseIndex
 from index import InvertedIndexReader, InvertedIndexWriter
+from util import preprocess
 
 class SPIMIIndex(BaseIndex):
     """
@@ -33,9 +34,8 @@ class SPIMIIndex(BaseIndex):
             doc_id = self.doc_id_map[doc_path]
             
             with open(doc_path, "r", encoding="utf8", errors="surrogateescape") as f:
-                # Sesuai bsbi.py yang lama, menggunakan pemisah spasi
-                # Idealnya di sini ada preprocessing/stemming
-                tokens = f.read().split() 
+                # Preprocessing lengkap (case folding, tokenization, stopword removal, stemming)
+                tokens = preprocess(f.read())
                 
             for token in tokens:
                 term_id = self.term_id_map[token]

@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 from base_index import BaseIndex
 from index import InvertedIndexReader, InvertedIndexWriter
+from util import preprocess
 
 class BSBIIndex(BaseIndex):
     """
@@ -16,8 +17,8 @@ class BSBIIndex(BaseIndex):
         for filename in next(os.walk(dir_path))[2]:
             docname = os.path.join(dir_path, filename)
             with open(docname, "r", encoding="utf8", errors="surrogateescape") as f:
-                # Tokenization sederhana (mengikuti bsbi.py yang lama)
-                for token in f.read().split():
+                # Preprocessing lengkap (case folding, tokenization, stopword removal, stemming)
+                for token in preprocess(f.read()):
                     td_pairs.append((self.term_id_map[token], self.doc_id_map[docname]))
         return td_pairs
 

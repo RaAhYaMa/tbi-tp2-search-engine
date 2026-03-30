@@ -6,7 +6,7 @@ import time
 import math
 
 from index import InvertedIndexReader, InvertedIndexWriter
-from util import IdMap, sorted_merge_posts_and_tfs
+from util import IdMap, sorted_merge_posts_and_tfs, preprocess
 from compression import StandardPostings, VBEPostings
 from tqdm import tqdm
 
@@ -58,37 +58,14 @@ class BSBIIndex:
         Gunakan tools available untuk Stemming Bahasa Inggris
 
         JANGAN LUPA BUANG STOPWORDS!
-
-        Untuk "sentence segmentation" dan "tokenization", bisa menggunakan
-        regex atau boleh juga menggunakan tools lain yang berbasis machine
-        learning.
-
-        Parameters
-        ----------
-        block_dir_relative : str
-            Relative Path ke directory yang mengandung text files untuk sebuah block.
-
-            CATAT bahwa satu folder di collection dianggap merepresentasikan satu block.
-            Konsep block di soal tugas ini berbeda dengan konsep block yang terkait
-            dengan operating systems.
-
-        Returns
-        -------
-        List[Tuple[Int, Int]]
-            Returns all the td_pairs extracted from the block
-            Mengembalikan semua pasangan <termID, docID> dari sebuah block (dalam hal
-            ini sebuah sub-direktori di dalam folder collection)
-
-        Harus menggunakan self.term_id_map dan self.doc_id_map untuk mendapatkan
-        termIDs dan docIDs. Dua variable ini harus 'persist' untuk semua pemanggilan
-        parse_block(...).
         """
         dir = "./" + self.data_dir + "/" + block_dir_relative
         td_pairs = []
         for filename in next(os.walk(dir))[2]:
             docname = dir + "/" + filename
             with open(docname, "r", encoding = "utf8", errors = "surrogateescape") as f:
-                for token in f.read().split():
+                # Preprocessing lengkap (case folding, tokenization, stopword removal, stemming)
+                for token in preprocess(f.read()):
                     td_pairs.append((self.term_id_map[token], self.doc_id_map[docname]))
 
         return td_pairs
@@ -203,7 +180,10 @@ class BSBIIndex:
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
-        terms = [self.term_id_map[word] for word in query.split()]
+        # Preprocessing query agar konsisten dengan index
+        query_tokens = preprocess(query)
+        terms = [self.term_id_map[token] for token in query_tokens if token in self.term_id_map]
+
         with InvertedIndexReader(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
 
             scores = {}
@@ -227,9 +207,9 @@ class BSBIIndex:
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
-        terms = [self.term_id_map[word] 
-                for word in query.split() 
-                if word in self.term_id_map]
+        # Preprocessing query agar konsisten dengan index
+        query_tokens = preprocess(query)
+        terms = [self.term_id_map[token] for token in query_tokens if token in self.term_id_map]
         
         with InvertedIndexReader(self.index_name,
                                 self.postings_encoding,
@@ -266,9 +246,9 @@ class BSBIIndex:
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
-        terms = [self.term_id_map[word] 
-                for word in query.split() 
-                if word in self.term_id_map]
+        # Preprocessing query agar konsisten dengan index
+        query_tokens = preprocess(query)
+        terms = [self.term_id_map[token] for token in query_tokens if token in self.term_id_map]
 
         with InvertedIndexReader(self.index_name,
                                 self.postings_encoding,

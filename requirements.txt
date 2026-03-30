@@ -1,5 +1,11 @@
+click==8.3.1
+faiss-cpu==1.13.2
+joblib==1.5.3
+nltk==3.9.4
+numpy==2.4.4
+packaging==26.0
+regex==2026.3.32
+scikit-learn==1.8.0
+scipy==1.17.1
+threadpoolctl==3.6.0
 tqdm==4.67.3
-scipy
-faiss-cpu
-scikit-learn
-numpy

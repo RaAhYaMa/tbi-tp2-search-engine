@@ -1,3 +1,28 @@
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+
+# Download resource data if not available
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
+
+# Initialize stemmer and stopwords
+stemmer = PorterStemmer()
+english_stopwords = set(stopwords.words('english'))
+
+def preprocess(text):
+    """
+    Melakukan normalisasi, tokenisasi (hanya alphanumeric), 
+    stopword removal, dan stemming.
+    """
+    # Case folding & Tokenization
+    tokens = re.findall(r'\b\w+\b', text.lower())
+    # Stopword removal & Stemming
+    return [stemmer.stem(token) for token in tokens if token not in english_stopwords]
+
 class TrieNode:
     """Node untuk struktur data Trie."""
     def __init__(self):
@@ -59,7 +84,7 @@ class IdMap:
             id_to_str[8] ---> "halo"
             id_to_str[54] ---> "/collection/dir0/gamma.txt"
         """
-        self.str_to_id = {}
+        self.str_to_id = Trie()
         self.id_to_str = []
 
     def __len__(self):
