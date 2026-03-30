@@ -9,22 +9,33 @@ from util import preprocess
 
 class SPIMIIndex(BaseIndex):
     """
-    Implementasi Single Pass In-Memory Indexing.
-    Membagi blok berdasarkan penggunaan memori (threshold).
+    Kelas yang mengimplementasikan Single Pass In-Memory Indexing (SPIMI).
+    Metode ini membangun indeks dengan cara memproses dokumen dan menyimpannya di memori 
+    hingga mencapai ambang batas tertentu sebelum di-flush ke disk sebagai blok intermediate.
     """
     def __init__(self, data_dir, output_dir, postings_encoding, 
                  memory_threshold_mb=10, index_name="main_index"):
+        """
+        Args:
+            data_dir (str): Direktori yang berisi koleksi dokumen.
+            output_dir (str): Direktori penyimpanan hasil indeks.
+            postings_encoding (class): Kelas kompresi untuk postings list.
+            memory_threshold_mb (int): Ambang batas penggunaan memori dalam MB (default: 10).
+            index_name (str): Nama dasar indeks.
+        """
         super().__init__(data_dir, output_dir, postings_encoding, index_name)
-        # Ambang batas dalam bytes
         self.memory_threshold = memory_threshold_mb * 1024 * 1024
 
     def index(self):
+        """
+        Memulai proses indexing menggunakan algoritma SPIMI.
+        Melewati seluruh dokumen, membangun kamus term di memori, dan melakukan merging blok.
+        """
         self.intermediate_indices = []
         block_id = 0
-        term_dict = {} # term_id -> set of doc_ids
-        term_tf = {}   # term_id -> {doc_id -> freq}
+        term_dict = {} 
+        term_tf = {}   
         
-        # Iterasi global semua file di dalam folder data_dir
         all_files = []
         for root, _, files in os.walk(self.data_dir):
             for file in files:
@@ -34,7 +45,6 @@ class SPIMIIndex(BaseIndex):
             doc_id = self.doc_id_map[doc_path]
             
             with open(doc_path, "r", encoding="utf8", errors="surrogateescape") as f:
-                # Preprocessing lengkap (case folding, tokenization, stopword removal, stemming)
                 tokens = preprocess(f.read())
                 
             for token in tokens:
@@ -47,9 +57,6 @@ class SPIMIIndex(BaseIndex):
                 term_dict[term_id].add(doc_id)
                 term_tf[term_id][doc_id] = term_tf[term_id].get(doc_id, 0) + 1
 
-            # Estimasi kasarnya penggunaan memori (dictionary + set + nested dict)
-            # Karena sys.getsizeof tidak rekursif, kita estimasi lewat jumlah token/entry jika ingin lebih akurat
-            # Namun untuk kemudahan, kita coba limit berbasis byte dari dictionary utama
             if (sys.getsizeof(term_dict) + sys.getsizeof(term_tf)) > self.memory_threshold:
                 self.flush_block(term_dict, term_tf, block_id)
                 term_dict.clear()
@@ -61,7 +68,6 @@ class SPIMIIndex(BaseIndex):
 
         self.save()
 
-        # Merging semua hasil intermediate
         with InvertedIndexWriter(self.index_name, self.postings_encoding, directory=self.output_dir) as merged_index:
             with contextlib.ExitStack() as stack:
                 indices = [stack.enter_context(InvertedIndexReader(index_id, self.postings_encoding, directory=self.output_dir))
@@ -69,7 +75,14 @@ class SPIMIIndex(BaseIndex):
                 self.merge(indices, merged_index)
 
     def flush_block(self, term_dict, term_tf, block_id):
-        """Menulis isi memori ke file index intermediate"""
+        """
+        Menulis isi dictionary term di memori ke file indeks intermediate (blok).
+
+        Args:
+            term_dict (dict): Dictionary mapping term_id ke set doc_id.
+            term_tf (dict): Dictionary mapping term_id ke mapping doc_id: freq.
+            block_id (int): Identifier untuk blok yang sedang ditulis.
+        """
         index_id = f'spimi_block_{block_id}'
         self.intermediate_indices.append(index_id)
         with InvertedIndexWriter(index_id, self.postings_encoding, directory=self.output_dir) as writer:

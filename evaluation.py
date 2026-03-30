@@ -6,25 +6,17 @@ from base_index import BaseIndex
 from lsi_index import LSIIndex
 from compression import VBEPostings
 
-######## >>>>> sebuah IR metric: RBP p = 0.8
 
 def rbp(ranking, p = 0.8):
-  """ menghitung search effectiveness metric score dengan 
-      Rank Biased Precision (RBP)
+  """ 
+  Menghitung skor Rank Biased Precision (RBP).
 
-      Parameters
-      ----------
-      ranking: List[int]
-         vektor biner seperti [1, 0, 1, 1, 1, 0]
-         gold standard relevansi dari dokumen di rank 1, 2, 3, dst.
-         Contoh: [1, 0, 1, 1, 1, 0] berarti dokumen di rank-1 relevan,
-                 di rank-2 tidak relevan, di rank-3,4,5 relevan, dan
-                 di rank-6 tidak relevan
-        
-      Returns
-      -------
-      Float
-        score RBP
+  Args:
+    ranking (list): List biner [1, 0, ...] yang menunjukkan relevansi dokumen pada tiap peringkat.
+    p (float): Parameter persistensi (default: 0.8).
+
+  Returns:
+    float: Skor RBP.
   """
   score = 0.
   for i in range(1, len(ranking) + 1):
@@ -34,6 +26,15 @@ def rbp(ranking, p = 0.8):
 
 
 def dcg(ranking):
+  """
+  Menghitung skor Discounted Cumulative Gain (DCG).
+
+  Args:
+    ranking (list): List biner atau nilai relevansi dokumen pada tiap peringkat.
+
+  Returns:
+    float: Skor DCG.
+  """
   score = 0.0
   for i in range(1, len(ranking) + 1):
     pos = i - 1
@@ -41,30 +42,48 @@ def dcg(ranking):
   return score
 
 def ndcg(ranking):
+  """
+  Menghitung skor Normalized Discounted Cumulative Gain (NDCG).
+
+  Args:
+    ranking (list): List biner atau nilai relevansi dokumen pada tiap peringkat.
+
+  Returns:
+    float: Skor NDCG.
+  """
   dcg_score = dcg(ranking)
   idcg_score = dcg(sorted(ranking, reverse = True))
   return dcg_score / idcg_score
 
 def ap(ranking):
+  """
+  Menghitung skor Average Precision (AP).
+
+  Args:
+    ranking (list): List biner yang menunjukkan relevansi dokumen pada tiap peringkat.
+
+  Returns:
+    float: Skor Average Precision.
+  """
   score = 0.0
   current_precision = 0.0
   for i in range(1, len(ranking) + 1):
     pos = i - 1
-    current_precision = current_precision + (ranking[pos] - current_precision) / i # precision at k
+    current_precision = current_precision + (ranking[pos] - current_precision) / i
     score += current_precision * ranking[pos]
   return score / len(ranking)
 
-######## >>>>> memuat qrels
-
 def load_qrels(qrel_file = "qrels.txt", max_q_id = 30, max_doc_id = 1033):
-  """ memuat query relevance judgment (qrels) 
-      dalam format dictionary of dictionary
-      qrels[query id][document id]
+  """ 
+  Memuat data query relevance judgment (qrels) dari file.
 
-      dimana, misal, qrels["Q3"][12] = 1 artinya Doc 12
-      relevan dengan Q3; dan qrels["Q3"][10] = 0 artinya
-      Doc 10 tidak relevan dengan Q3.
+  Args:
+    qrel_file (str): Path ke file qrels.
+    max_q_id (int): Jumlah maksimum query (default: 30).
+    max_doc_id (int): Jumlah maksimum dokumen (default: 1033).
 
+  Returns:
+    dict: Dictionary bersarang qrels[query_id][doc_id] berisi nilai relevansi (0 atau 1).
   """
   qrels = {"Q" + str(i) : {i:0 for i in range(1, max_doc_id + 1)} \
                  for i in range(1, max_q_id + 1)}
@@ -76,13 +95,17 @@ def load_qrels(qrel_file = "qrels.txt", max_q_id = 30, max_doc_id = 1033):
       qrels[qid][did] = 1
   return qrels
 
-######## >>>>> EVALUASI !
-
 def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 'tfidf'):
   """ 
-    loop ke semua 30 query, hitung score di setiap query,
-    lalu hitung MEAN SCORE over those 30 queries.
-    untuk setiap query, kembalikan top-1000 documents
+  Melakukan evaluasi performa mesin pencari terhadap seluruh query menggunakan metrik tertentu.
+  Menampilkan nilai rata-rata (mean) skor dari semua query.
+
+  Args:
+    qrels (dict): Data relevance judgment hasil load_qrels.
+    query_file (str): Path ke file yang berisi daftar query.
+    k (int): Jumlah dokumen teratas yang diambil untuk evaluasi (default: 1000).
+    metric (str): Metrik evaluasi yang digunakan ('RBP', 'DCG', 'NDCG', atau 'AP').
+    scoring (str): Metode scoring yang digunakan ('tfidf', 'bm25', 'bm25_wand', atau 'lsi').
   """
   if scoring.lower() == 'lsi':
     index_instance = LSIIndex(data_dir = 'collection', \
@@ -101,8 +124,6 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
       qid = parts[0]
       query = " ".join(parts[1:])
 
-      # HATI-HATI, doc id saat indexing bisa jadi berbeda dengan doc id
-      # yang tertera di qrels
       ranking = []
       if scoring.lower() == 'tfidf':
         results = index_instance.retrieve_tfidf(query, k = k)
@@ -116,15 +137,12 @@ def eval(qrels, query_file = "queries.txt", k = 1000, metric = 'RBP', scoring = 
         raise ValueError("Scoring method tidak dikenal")
 
       for (score, doc) in results:
-          # doc is a path like 'collection/0/123.txt' or './collection/0/123.txt'
-          # we want to extract the '123' part
-          match = re.search(r'(\d+)\.txt$', doc)
-          if match:
-              did = int(match.group(1))
-          else:
-              # Fallback if the filename is not just digits
-              did = int(os.path.splitext(os.path.basename(doc))[0])
-          ranking.append(qrels[qid][did])
+        match = re.search(r'(\d+)\.txt$', doc)
+        if match:
+          did = int(match.group(1))
+        else:
+          did = int(os.path.splitext(os.path.basename(doc))[0])
+        ranking.append(qrels[qid][did])
       
       if metric.upper() == 'RBP':
         scores.append(rbp(ranking))

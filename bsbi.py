@@ -12,18 +12,20 @@ from tqdm import tqdm
 
 class BSBIIndex:
     """
-    Attributes
-    ----------
-    term_id_map(IdMap): Untuk mapping terms ke termIDs
-    doc_id_map(IdMap): Untuk mapping relative paths dari dokumen (misal,
-                    /collection/0/gamma.txt) to docIDs
-    data_dir(str): Path ke data
-    output_dir(str): Path ke output index files
-    postings_encoding: Lihat di compression.py, kandidatnya adalah StandardPostings,
-                    VBEPostings, dsb.
-    index_name(str): Nama dari file yang berisi inverted index
+    Kelas untuk pembuatan indeks menggunakan algoritma Blocked Sort-Based Indexing (BSBI).
+    Meliputi proses parsing dokumen, pembuatan indeks antara, penggabungan indeks,
+    dan pencarian peringkat (ranked retrieval) menggunakan TF-IDF atau BM25.
     """
     def __init__(self, data_dir, output_dir, postings_encoding, index_name = "main_index"):
+        """
+        Inisialisasi objek BSBIIndex.
+
+        Args:
+            data_dir (str): Path ke direktori data dokumen.
+            output_dir (str): Path ke direktori output untuk menyimpan file indeks.
+            postings_encoding: Objek encoding untuk postings list.
+            index_name (str): Nama dasar untuk file indeks yang dihasilkan.
+        """
         self.term_id_map = IdMap()
         self.doc_id_map = IdMap()
         self.data_dir = data_dir
@@ -31,11 +33,12 @@ class BSBIIndex:
         self.index_name = index_name
         self.postings_encoding = postings_encoding
 
-        # Untuk menyimpan nama-nama file dari semua intermediate inverted index
         self.intermediate_indices = []
 
     def save(self):
-        """Menyimpan doc_id_map and term_id_map ke output directory via pickle"""
+        """
+        Menyimpan term_id_map dan doc_id_map ke direktori output dalam format pickle.
+        """
 
         with open(os.path.join(self.output_dir, 'terms.dict'), 'wb') as f:
             pickle.dump(self.term_id_map, f)
@@ -43,7 +46,9 @@ class BSBIIndex:
             pickle.dump(self.doc_id_map, f)
 
     def load(self):
-        """Memuat doc_id_map and term_id_map dari output directory"""
+        """
+        Memuat term_id_map dan doc_id_map dari direktori output.
+        """
 
         with open(os.path.join(self.output_dir, 'terms.dict'), 'rb') as f:
             self.term_id_map = pickle.load(f)
@@ -52,19 +57,19 @@ class BSBIIndex:
 
     def parse_block(self, block_dir_relative):
         """
-        Lakukan parsing terhadap text file sehingga menjadi sequence of
-        <termID, docID> pairs.
+        Membaca blok (sub-direktori) dan mengekstrak pasangan (term_id, doc_id).
 
-        Gunakan tools available untuk Stemming Bahasa Inggris
+        Args:
+            block_dir_relative (str): Path relatif sub-direktori blok di dalam data_dir.
 
-        JANGAN LUPA BUANG STOPWORDS!
+        Returns:
+            list: List of tuple (term_id, doc_id) dari semua dokumen dalam blok tersebut.
         """
         dir = "./" + self.data_dir + "/" + block_dir_relative
         td_pairs = []
         for filename in next(os.walk(dir))[2]:
             docname = dir + "/" + filename
             with open(docname, "r", encoding = "utf8", errors = "surrogateescape") as f:
-                # Preprocessing lengkap (case folding, tokenization, stopword removal, stemming)
                 for token in preprocess(f.read()):
                     td_pairs.append((self.term_id_map[token], self.doc_id_map[docname]))
 
@@ -72,25 +77,12 @@ class BSBIIndex:
 
     def invert_write(self, td_pairs, index):
         """
-        Melakukan inversion td_pairs (list of <termID, docID> pairs) dan
-        menyimpan mereka ke index. Disini diterapkan konsep BSBI dimana 
-        hanya di-mantain satu dictionary besar untuk keseluruhan block.
-        Namun dalam teknik penyimpanannya digunakan srategi dari SPIMI
-        yaitu penggunaan struktur data hashtable (dalam Python bisa
-        berupa Dictionary)
+        Melakukan inversi pada pasangan term-document dan menuliskannya ke indeks.
+        Menggunakan strategi mirip SPIMI dengan kamus besar tunggal untuk setiap blok.
 
-        ASUMSI: td_pairs CUKUP di memori
-
-        Di Tugas Pemrograman 1, kita hanya menambahkan term dan
-        juga list of sorted Doc IDs. Sekarang di Tugas Pemrograman 2,
-        kita juga perlu tambahkan list of TF.
-
-        Parameters
-        ----------
-        td_pairs: List[Tuple[Int, Int]]
-            List of termID-docID pairs
-        index: InvertedIndexWriter
-            Inverted index pada disk (file) yang terkait dengan suatu "block"
+        Args:
+            td_pairs (list): List of tuple (term_id, doc_id).
+            index (InvertedIndexWriter): Objek writer untuk menulis hasil data yang dibalik.
         """
         term_dict = {}
         term_tf = {}
@@ -109,28 +101,16 @@ class BSBIIndex:
 
     def merge(self, indices, merged_index):
         """
-        Lakukan merging ke semua intermediate inverted indices menjadi
-        sebuah single index.
+        Melakukan penggabungan (merging) beberapa indeks antara menjadi satu indeks tunggal.
+        Menggunakan algoritma external merge sort.
 
-        Ini adalah bagian yang melakukan EXTERNAL MERGE SORT
-
-        Gunakan fungsi orted_merge_posts_and_tfs(..) di modul util
-
-        Parameters
-        ----------
-        indices: List[InvertedIndexReader]
-            A list of intermediate InvertedIndexReader objects, masing-masing
-            merepresentasikan sebuah intermediate inveted index yang iterable
-            di sebuah block.
-
-        merged_index: InvertedIndexWriter
-            Instance InvertedIndexWriter object yang merupakan hasil merging dari
-            semua intermediate InvertedIndexWriter objects.
+        Args:
+            indices (list): List dari objek InvertedIndexReader yang akan digabung.
+            merged_index (InvertedIndexWriter): Objek writer untuk menyimpan hasil penggabungan.
         """
-        # kode berikut mengasumsikan minimal ada 1 term
         merged_iter = heapq.merge(*indices, key = lambda x: x[0])
-        curr, postings, tf_list = next(merged_iter) # first item
-        for t, postings_, tf_list_ in merged_iter: # from the second item
+        curr, postings, tf_list = next(merged_iter)
+        for t, postings_, tf_list_ in merged_iter:
             if t == curr:
                 zip_p_tf = sorted_merge_posts_and_tfs(list(zip(postings, tf_list)), \
                                                       list(zip(postings_, tf_list_)))
@@ -143,44 +123,18 @@ class BSBIIndex:
 
     def retrieve_tfidf(self, query, k = 10):
         """
-        Melakukan Ranked Retrieval dengan skema TaaT (Term-at-a-Time).
-        Method akan mengembalikan top-K retrieval results.
+        Melakukan pencarian peringkat menggunakan skema pembobotan TF-IDF.
 
-        w(t, D) = (1 + log tf(t, D))       jika tf(t, D) > 0
-                = 0                        jika sebaliknya
+        Args:
+            query (str): Kalimat query pencarian.
+            k (int): Jumlah dokumen teratas yang ingin dikembalikan.
 
-        w(t, Q) = IDF = log (N / df(t))
-
-        Score = untuk setiap term di query, akumulasikan w(t, Q) * w(t, D).
-                (tidak perlu dinormalisasi dengan panjang dokumen)
-
-        catatan: 
-            1. informasi DF(t) ada di dictionary postings_dict pada merged index
-            2. informasi TF(t, D) ada di tf_li
-            3. informasi N bisa didapat dari doc_length pada merged index, len(doc_length)
-
-        Parameters
-        ----------
-        query: str
-            Query tokens yang dipisahkan oleh spasi
-
-            contoh: Query "universitas indonesia depok" artinya ada
-            tiga terms: universitas, indonesia, dan depok
-
-        Result
-        ------
-        List[(int, str)]
-            List of tuple: elemen pertama adalah score similarity, dan yang
-            kedua adalah nama dokumen.
-            Daftar Top-K dokumen terurut mengecil BERDASARKAN SKOR.
-
-        JANGAN LEMPAR ERROR/EXCEPTION untuk terms yang TIDAK ADA di collection.
-
+        Returns:
+            list: List of tuple (score, doc_name) yang telah diurutkan menurun berdasarkan skor.
         """
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
-        # Preprocessing query agar konsisten dengan index
         query_tokens = preprocess(query)
         terms = [self.term_id_map[token] for token in query_tokens if token in self.term_id_map]
 
@@ -199,15 +153,25 @@ class BSBIIndex:
                         if tf > 0:
                             scores[doc_id] += math.log(N / df) * (1 + math.log(tf))
 
-            # Top-K
             docs = [(score, self.doc_id_map[doc_id]) for (doc_id, score) in scores.items()]
-            return sorted(docs, key = lambda x: x[0], reverse = True)[:k]
+            return sorted(docs, key = lambda x: (x[0], x[1]), reverse = True)[:k]
 
     def retrieve_bm25(self, query, k = 10, k1 = 1.6, b = 0.75):
+        """
+        Melakukan pencarian peringkat menggunakan skema pembobotan BM25.
+
+        Args:
+            query (str): Kalimat query pencarian.
+            k (int): Jumlah dokumen teratas yang ingin dikembalikan.
+            k1 (float): Parameter k1 (default: 1.6).
+            b (float): Parameter b (default: 0.75).
+
+        Returns:
+            list: List of tuple (score, doc_name) yang telah diurutkan menurun berdasarkan skor.
+        """
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
-        # Preprocessing query agar konsisten dengan index
         query_tokens = preprocess(query)
         terms = [self.term_id_map[token] for token in query_tokens if token in self.term_id_map]
         
@@ -236,17 +200,27 @@ class BSBIIndex:
                         
                         scores[doc_id] += idf * tf_weight
 
-            # Top-K
             docs = [(score, self.doc_id_map[doc_id])
                     for (doc_id, score) in scores.items()]
 
             return sorted(docs, key = lambda x: (x[0], x[1]), reverse = True)[:k]
     
     def retrieve_bm25_wand(self, query, k = 10, k1 = 1.6, b = 0.75):
+        """
+        Melakukan pencarian peringkat menggunakan algoritma WAND (Weak AND) dengan pembobotan BM25.
+
+        Args:
+            query (str): Kalimat query pencarian.
+            k (int): Jumlah dokumen teratas yang ingin dikembalikan.
+            k1 (float): Parameter k1 (default: 1.6).
+            b (float): Parameter b (default: 0.75).
+
+        Returns:
+            list: List of tuple (score, doc_name) yang telah diurutkan menurun berdasarkan skor.
+        """
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
-        # Preprocessing query agar konsisten dengan index
         query_tokens = preprocess(query)
         terms = [self.term_id_map[token] for token in query_tokens if token in self.term_id_map]
 
@@ -265,17 +239,16 @@ class BSBIIndex:
                     df = data[1]
                     idf = math.log(N / df)
 
-                    # Untuk dl, loosely pakai dl terpendek dari seluruh dokumen
                     ut = idf * ((k1 + 1) * max_tf) / (k1 * ((1 - b) + b * min_dl / avdl) + max_tf)
 
                     postings, tf_list = merged_index.get_postings_list(term)
                     p_length = len(postings)
-                    postings.append(-1) # Menandakan last_id
+                    postings.append(-1)
                     term_data.append({'p': postings, 'tf': tf_list, 'idx': 0, 'ut': ut, 'idf': idf, 'p_len': p_length})
 
             if not term_data: return []
 
-            top_k = [] # Min-heap
+            top_k = []
             threshold = 0
             while True:
                 term_data.sort(key=lambda x: x['p'][x['idx']] if x['idx'] < x['p_len'] else float('inf'))
@@ -320,15 +293,10 @@ class BSBIIndex:
 
     def index(self):
         """
-        Base indexing code
-        BAGIAN UTAMA untuk melakukan Indexing dengan skema BSBI (blocked-sort
-        based indexing)
-
-        Method ini scan terhadap semua data di collection, memanggil parse_block
-        untuk parsing dokumen dan memanggil invert_write yang melakukan inversion
-        di setiap block dan menyimpannya ke index yang baru.
+        Menjalankan seluruh proses pembuatan indeks dengan skema BSBI.
+        Proses ini mencakup parsing blok, pembuatan indeks antara, penyimpanan Kamus,
+        dan penggabungan indeks antara menjadi satu indeks utama.
         """
-        # loop untuk setiap sub-directory di dalam folder collection (setiap block)
         for block_dir_relative in tqdm(sorted(next(os.walk(self.data_dir))[1])):
             td_pairs = self.parse_block(block_dir_relative)
             index_id = 'intermediate_index_'+block_dir_relative
@@ -351,4 +319,4 @@ if __name__ == "__main__":
     BSBI_instance = BSBIIndex(data_dir = 'collection', \
                               postings_encoding = VBEPostings, \
                               output_dir = 'index')
-    BSBI_instance.index() # memulai indexing!
+    BSBI_instance.index()

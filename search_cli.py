@@ -1,3 +1,8 @@
+"""
+Antarmuka baris perintah (CLI) untuk melakukan pencarian pada sistem temu balik informasi.
+Mendukung berbagai metode scoring seperti TF-IDF, BM25, WAND, dan LSI.
+"""
+
 import argparse
 import sys
 from base_index import BaseIndex
@@ -5,23 +10,24 @@ from compression import VBEPostings
 from lsi_index import LSIIndex
 
 def main():
-    parser = argparse.ArgumentParser(description="Search CLI for the Information Retrieval system.")
+    """ 
+    Fungsi utama untuk menangani argumen baris perintah dan menampilkan hasil pencarian.
+    Dapat menerima query tunggal atau daftar query dari sebuah file.
+    """
+    parser = argparse.ArgumentParser(description="Antarmuka Pencarian (Search CLI) untuk Sistem Temu Balik Informasi.")
     
-    # Query arguments
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("query", nargs="?", help="The search query.")
-    group.add_argument("--file", "-f", help="Path to a file containing queries (one per line).")
+    group.add_argument("query", nargs="?", help="Teks query pencarian.")
+    group.add_argument("--file", "-f", help="Path ke file yang berisi daftar query (satu per baris).")
     
-    # Configuration arguments
-    parser.add_argument("-k", type=int, default=10, help="Number of results to return (default: 10).")
+    parser.add_argument("-k", type=int, default=10, help="Jumlah hasil yang ingin dikembalikan (default: 10).")
     parser.add_argument("--method", "-m", choices=["tfidf", "bm25", "bm25_wand", "lsi"], default="tfidf",
-                        help="Scoring method to use (default: tfidf).")
-    parser.add_argument("--data_dir", default="collection", help="Data directory (default: 'collection').")
-    parser.add_argument("--output_dir", default="index", help="Index directory (default: 'index').")
+                        help="Metode skoring yang digunakan (default: tfidf).")
+    parser.add_argument("--data_dir", default="collection", help="Direktori koleksi dokumen (default: 'collection').")
+    parser.add_argument("--output_dir", default="index", help="Direktori penyimpanan indeks (default: 'index').")
 
     args = parser.parse_args()
 
-    # Initialize index
     if args.method == "lsi":
         index_instance = LSIIndex(data_dir=args.data_dir,
                                   postings_encoding=VBEPostings,
@@ -31,22 +37,20 @@ def main():
                                    postings_encoding=VBEPostings,
                                    output_dir=args.output_dir)
     
-    # Load queries
     if args.file:
         try:
             with open(args.file, 'r') as f:
                 queries = [line.strip() for line in f if line.strip()]
         except FileNotFoundError:
-            print(f"Error: File '{args.file}' not found.")
+            print(f"Error: File '{args.file}' tidak ditemukan.")
             sys.exit(1)
     else:
         queries = [args.query]
-
-    # Process queries
+ 
     for query in queries:
         print(f"Query  : {query}")
-        print(f"Method : {args.method}")
-        print("Results:")
+        print(f"Metode : {args.method}")
+        print("Hasil  :")
         
         if args.method == "tfidf":
             results = index_instance.retrieve_tfidf(query, k=args.k)
@@ -58,9 +62,9 @@ def main():
             results = index_instance.retrieve_lsi(query, k=args.k)
         else:
             results = []
-
+ 
         if not results:
-            print("  No results found.")
+            print("  Tidak ada hasil yang ditemukan.")
         else:
             for score, doc in results:
                 print(f"  {doc:30} {score:>.3f}")

@@ -1,26 +1,33 @@
+"""
+Skrip untuk memverifikasi kebenaran algoritma WAND (Weak AND) dibandingkan dengan 
+pencarian BM25 standar (exhaustive search). Membandingkan hasil dokumen, skor, dan waktu eksekusi.
+"""
+
 import sys
 import time
 from base_index import BaseIndex
 from compression import VBEPostings
 
 def verify():
-    # Inisialisasi index
+    """ 
+    Melakukan pengujian komparatif antara retrieve_bm25 dan retrieve_bm25_wand.
+    Memastikan bahwa optimasi WAND memberikan hasil yang sama dengan pencarian penuh 
+    namun dengan performa yang lebih cepat.
+    """
     bsbi = BaseIndex(data_dir='collection', 
                      postings_encoding=VBEPostings, 
                      output_dir='index')
     
-    # Kumpulan query uji
     test_queries = [
         "alkylated with radioactive iodoacetate",
         "psychodrama for disturbed children",
         "lipid metabolism in toxemia and normal pregnancy"
     ]
 
-    print(f"{'Query':<40} | {'Status':<10} | {'Org Time':<11} | {'WAND Time':<11} | {'Speedup':<9} | {'Notes'}")
+    print(f"{'Query':<40} | {'Status':<10} | {'Waktu Asli':<11} | {'Waktu WAND':<11} | {'Speedup':<9} | {'Keterangan'}")
     print("-" * 115)
 
     for query in test_queries:
-        # Panggil kedua metode
         start_orig = time.perf_counter()
         res_original = bsbi.retrieve_bm25(query, k=10)
         end_orig = time.perf_counter()
@@ -33,12 +40,9 @@ def verify():
 
         speedup = time_orig / time_wand if time_wand > 0 else 0
 
-        # 1. Cek jumlah hasil
         if len(res_original) != len(res_wand):
-            print(f"{query[:40]:<40} | FAILED     | {time_orig:10.4f}s | {time_wand:10.4f}s | {speedup:8.2f}x | Diff length: {len(res_original)} vs {len(res_wand)}")
+            print(f"{query[:40]:<40} | GAGAL      | {time_orig:10.4f}s | {time_wand:10.4f}s | {speedup:8.2f}x | Beda jumlah: {len(res_original)} vs {len(res_wand)}")
             continue
-
-        # 2. Bandingkan isi (doc_id dan score)
         match = True
         max_diff = 0
         for i in range(len(res_original)):
@@ -53,10 +57,10 @@ def verify():
             if diff > max_diff:
                 max_diff = diff
 
-        if match and max_diff < 1e-4: # Toleransi floating point
-            print(f"{query[:40]:<40} | SUCCESS    | {time_orig:10.4f}s | {time_wand:10.4f}s | {speedup:8.2f}x | Max diff: {max_diff:.6f}")
+        if match and max_diff < 1e-4: 
+            print(f"{query[:40]:<40} | BERHASIL   | {time_orig:10.4f}s | {time_wand:10.4f}s | {speedup:8.2f}x | Selisih skor: {max_diff:.6f}")
         else:
-            print(f"{query[:40]:<40} | FAILED     | {time_orig:10.4f}s | {time_wand:10.4f}s | {speedup:8.2f}x | Doc mismatch or large diff")
+            print(f"{query[:40]:<40} | GAGAL      | {time_orig:10.4f}s | {time_wand:10.4f}s | {speedup:8.2f}x | Dokumen beda atau selisih besar")
 
 if __name__ == "__main__":
     verify()

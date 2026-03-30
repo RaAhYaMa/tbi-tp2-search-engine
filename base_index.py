@@ -10,10 +10,20 @@ from scoring import BM25Scorer, TFIDFScorer
 
 class BaseIndex:
     """
-    Base class for indexing and retrieval.
-    Contains common methods for ID mapping, metadata persistence, merging, and ranked retrieval.
+    Kelas dasar untuk pembuatan indeks dan pencarian (retrieval).
+    Berisi metode umum untuk pemetaan ID, persistensi metadata, penggabungan (merging),
+    dan pencarian peringkat (ranked retrieval).
     """
     def __init__(self, data_dir, output_dir, postings_encoding, index_name="main_index"):
+        """
+        Inisialisasi objek BaseIndex.
+
+        Args:
+            data_dir (str): Path ke direktori yang berisi data dokumen.
+            output_dir (str): Path ke direktori output untuk menyimpan file indeks.
+            postings_encoding: Objek encoding yang digunakan untuk postings list.
+            index_name (str): Nama dasar untuk file indeks yang dihasilkan.
+        """
         self.term_id_map = IdMap()
         self.doc_id_map = IdMap()
         self.data_dir = data_dir
@@ -23,14 +33,18 @@ class BaseIndex:
         self.intermediate_indices = []
 
     def save(self):
-        """Menyimpan doc_id_map and term_id_map ke output directory via pickle"""
+        """
+        Menyimpan term_id_map dan doc_id_map ke direktori output dalam format pickle.
+        """
         with open(os.path.join(self.output_dir, 'terms.dict'), 'wb') as f:
             pickle.dump(self.term_id_map, f)
         with open(os.path.join(self.output_dir, 'docs.dict'), 'wb') as f:
             pickle.dump(self.doc_id_map, f)
 
     def load(self):
-        """Memuat doc_id_map and term_id_map dari output directory"""
+        """
+        Memuat term_id_map dan doc_id_map dari direktori output.
+        """
         with open(os.path.join(self.output_dir, 'terms.dict'), 'rb') as f:
             self.term_id_map = pickle.load(f)
         with open(os.path.join(self.output_dir, 'docs.dict'), 'rb') as f:
@@ -38,8 +52,12 @@ class BaseIndex:
 
     def merge(self, indices, merged_index):
         """
-        Lakukan merging ke semua intermediate inverted indices menjadi sebuah single index.
-        Ini adalah bagian yang melakukan EXTERNAL MERGE SORT.
+        Melakukan penggabungan (merging) beberapa indeks antara menjadi satu indeks tunggal.
+        Menggunakan algoritma external merge sort untuk menangani data yang besar.
+
+        Args:
+            indices (list): List dari iterator postings list yang akan digabung.
+            merged_index (InvertedIndexWriter): Objek writer untuk menyimpan hasil penggabungan.
         """
         merged_iter = heapq.merge(*indices, key=lambda x: x[0])
         try:
@@ -59,6 +77,16 @@ class BaseIndex:
         merged_index.append(curr, postings, tf_list)
 
     def retrieve_tfidf(self, query, k=10):
+        """
+        Melakukan pencarian dokumen berdasarkan query menggunakan skema pembobotan TF-IDF.
+
+        Args:
+            query (str): String query pencarian.
+            k (int): Jumlah dokumen teratas yang ingin dikembalikan.
+
+        Returns:
+            list: List of tuple (score, doc_name) yang telah diurutkan menurun berdasarkan skor.
+        """
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
@@ -79,9 +107,21 @@ class BaseIndex:
                         scores[doc_id] += scorer.score(tf, idf)
 
             docs = [(score, self.doc_id_map[doc_id]) for (doc_id, score) in scores.items()]
-            return sorted(docs, key=lambda x: x[0], reverse=True)[:k]
+            return sorted(docs, key=lambda x: (x[0], x[1]), reverse=True)[:k]
 
     def retrieve_bm25(self, query, k=10, k1=1.6, b=0.75):
+        """
+        Melakukan pencarian dokumen berdasarkan query menggunakan skema pembobotan BM25.
+
+        Args:
+            query (str): String query pencarian.
+            k (int): Jumlah dokumen teratas yang ingin dikembalikan.
+            k1 (float): Parameter k1 untuk BM25 (default: 1.6).
+            b (float): Parameter b untuk BM25 (default: 0.75).
+
+        Returns:
+            list: List of tuple (score, doc_name) yang telah diurutkan menurun berdasarkan skor.
+        """
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
@@ -108,6 +148,20 @@ class BaseIndex:
             return sorted(docs, key=lambda x: (x[0], x[1]), reverse=True)[:k]
 
     def retrieve_bm25_wand(self, query, k=10, k1=1.6, b=0.75):
+        """
+        Melakukan pencarian dokumen menggunakan algoritma WAND (Weak AND) dengan pembobotan BM25.
+        Algoritma ini lebih efisien karena dapat melewatkan dokumen yang tidak mungkin 
+        masuk ke dalam top-k.
+
+        Args:
+            query (str): String query pencarian.
+            k (int): Jumlah dokumen teratas yang ingin dikembalikan.
+            k1 (float): Parameter k1 untuk BM25.
+            b (float): Parameter b untuk BM25.
+
+        Returns:
+            list: List of tuple (score, doc_name) yang telah diurutkan menurun berdasarkan skor.
+        """
         if len(self.term_id_map) == 0 or len(self.doc_id_map) == 0:
             self.load()
 
@@ -169,4 +223,7 @@ class BaseIndex:
         return sorted(top_k, key=lambda x: (x[0], x[1]), reverse=True)
 
     def index(self):
+        """
+        Metode abstrak untuk membangun indeks. Harus diimplementasikan oleh subclass.
+        """
         raise NotImplementedError("Subclasses must implement index()")

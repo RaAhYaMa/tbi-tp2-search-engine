@@ -3,39 +3,57 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 
-# Download resource data if not available
 try:
     nltk.data.find('corpora/stopwords')
 except LookupError:
     nltk.download('stopwords')
-
-# Initialize stemmer and stopwords
 stemmer = PorterStemmer()
 english_stopwords = set(stopwords.words('english'))
 
 def preprocess(text):
     """
-    Melakukan normalisasi, tokenisasi (hanya alphanumeric), 
-    stopword removal, dan stemming.
+    Melakukan normalisasi teks, tokenisasi (hanya karakter alfanumerik), 
+    penghapusan stopword, dan stemming (Porter Stemmer).
+
+    Args:
+        text (str): Teks mentah yang akan diproses.
+
+    Returns:
+        list: Daftar token yang sudah diproses.
     """
-    # Case folding & Tokenization
     tokens = re.findall(r'\b\w+\b', text.lower())
-    # Stopword removal & Stemming
     return [stemmer.stem(token) for token in tokens if token not in english_stopwords]
 
 class TrieNode:
-    """Node untuk struktur data Trie."""
+    """
+    Node untuk struktur data Trie.
+    Menyimpan anak (children) dalam bentuk dictionary dan ID jika node tersebut adalah akhir kata.
+    """
     def __init__(self):
         self.children = {}
         self.id = -1
 
 class Trie:
-    """Implementasi Trie untuk pemetaan string ke integer ID."""
+    """
+    Implementasi struktur data Trie untuk pemetaan string ke integer ID secara efisien.
+    Sangat berguna untuk menangani kamus term yang besar.
+    """
     def __init__(self):
         self.root = TrieNode()
 
     def __getitem__(self, key):
-        """Mengambil ID dari kata. Mengembalikan -1 jika tidak ditemukan."""
+        """
+        Mencari kata dalam Trie dan mengembalikan ID-nya.
+        
+        Args:
+            key (str): Kata yang akan dicari.
+
+        Returns:
+            int: ID yang terasosiasi dengan kata tersebut.
+
+        Raises:
+            KeyError: Jika kata tidak ditemukan dalam Trie.
+        """
         node = self.root
         for char in key:
             if char not in node.children:
@@ -46,7 +64,13 @@ class Trie:
         return node.id
 
     def __setitem__(self, key, value):
-        """Memasukkan kata ke dalam Trie dan mengasosiasikannya dengan sebuah ID."""
+        """
+        Memasukkan kata baru ke dalam Trie atau memperbarui ID-nya.
+
+        Args:
+            key (str): Kata yang akan dimasukkan.
+            value (int): ID yang ingin diasosiasikan.
+        """
         node = self.root
         for char in key:
             if char not in node.children:
@@ -55,6 +79,7 @@ class Trie:
         node.id = value
 
     def __contains__(self, key):
+        """Mengecek apakah suatu kata ada di dalam Trie."""
         node = self.root
         for char in key:
             if char not in node.children:
@@ -64,42 +89,38 @@ class Trie:
 
 class IdMap:
     """
-    Ingat kembali di kuliah, bahwa secara praktis, sebuah dokumen dan
-    sebuah term akan direpresentasikan sebagai sebuah integer. Oleh
-    karena itu, kita perlu maintain mapping antara string term (atau
-    dokumen) ke integer yang bersesuaian, dan sebaliknya. Kelas IdMap ini
-    akan melakukan hal tersebut.
+    Kelas untuk mengelola pemetaan dua arah antara string (term atau dokumen) dan integer ID.
+    Menggunakan Trie untuk pencarian string-ke-ID yang cepat dan List untuk ID-ke-string.
     """
 
     def __init__(self):
         """
-        Mapping dari string (term atau nama dokumen) ke id disimpan dalam
-        python's dictionary; cukup efisien. Mapping sebaliknya disimpan dalam
-        python's list.
+        Inisialisasi IdMap dengan Trie untuk str_to_id dan List untuk id_to_str.
 
-        contoh:
+        Contoh:
             str_to_id["halo"] ---> 8
-            str_to_id["/collection/dir0/gamma.txt"] ---> 54
-
             id_to_str[8] ---> "halo"
-            id_to_str[54] ---> "/collection/dir0/gamma.txt"
         """
         self.str_to_id = Trie()
         self.id_to_str = []
 
     def __len__(self):
-        """Mengembalikan banyaknya term (atau dokumen) yang disimpan di IdMap."""
+        """Mengembalikan jumlah total elemen yang dipetakan."""
         return len(self.id_to_str)
 
     def __get_str(self, i):
-        """Mengembalikan string yang terasosiasi dengan index i."""
+        """Mengambil string berdasarkan ID (index)."""
         return self.id_to_str[i]
 
     def __get_id(self, s):
         """
-        Mengembalikan integer id i yang berkorespondensi dengan sebuah string s.
-        Jika s tidak ada pada IdMap, lalu assign sebuah integer id baru dan kembalikan
-        integer id baru tersebut.
+        Mengambil ID berdasarkan string. Jika string belum ada, ID baru akan di-assign.
+
+        Args:
+            s (str): String yang ingin dicari ID-nya.
+
+        Returns:
+            int: ID yang unik untuk string tersebut.
         """
         if s not in self.str_to_id:
             self.id_to_str.append(s)
@@ -108,42 +129,32 @@ class IdMap:
 
     def __getitem__(self, key):
         """
-        __getitem__(...) adalah special method di Python, yang mengizinkan sebuah
-        collection class (seperti IdMap ini) mempunyai mekanisme akses atau
-        modifikasi elemen dengan syntax [..] seperti pada list dan dictionary di Python.
-
-        Jika key adalah integer, gunakan __get_str;
-        jika key adalah string, gunakan __get_id
+        Memungkinkan akses menggunakan bracket [..]. 
+        Mendukung pencarian dua arah berdasarkan tipe input (int atau str).
         """
         if type(key) is int:
             return self.__get_str(key)
         elif type(key) is str:
             return self.__get_id(key)
         else:
-            raise TypeError
+            raise TypeError("Key harus berupa int (untuk ID) atau str (untuk Term/Dokumen)")
 
 def sorted_merge_posts_and_tfs(posts_tfs1, posts_tfs2):
     """
-    Menggabung (merge) dua lists of tuples (doc id, tf) dan mengembalikan
-    hasil penggabungan keduanya (TF perlu diakumulasikan untuk semua tuple
-    dengn doc id yang sama), dengan aturan berikut:
+    Menggabungkan (merge) dua list (doc_id, tf) yang sudah terurut menjadi satu list terurut.
+    Akumulasi TF dilakukan jika terdapat doc_id yang sama pada kedua list.
 
-    contoh: posts_tfs1 = [(1, 34), (3, 2), (4, 23)]
-            posts_tfs2 = [(1, 11), (2, 4), (4, 3 ), (6, 13)]
+    Contoh: 
+        L1 = [(1, 34), (3, 2)]
+        L2 = [(1, 11), (2, 4)]
+        Hasil = [(1, 45), (2, 4), (3, 2)]
 
-            return   [(1, 34+11), (2, 4), (3, 2), (4, 23+3), (6, 13)]
-                   = [(1, 45), (2, 4), (3, 2), (4, 26), (6, 13)]
+    Args:
+        posts_tfs1 (list): List tuple (doc_id, tf) pertama yang sudah terurut.
+        posts_tfs2 (list): List tuple (doc_id, tf) kedua yang sudah terurut.
 
-    Parameters
-    ----------
-    list1: List[(Comparable, int)]
-    list2: List[(Comparable, int]
-        Dua buah sorted list of tuples yang akan di-merge.
-
-    Returns
-    -------
-    List[(Comparablem, int)]
-        Penggabungan yang sudah terurut
+    Returns:
+        list: Hasil penggabungan yang sudah terurut berdasarkan doc_id.
     """
     i, j = 0, 0
     merge = []

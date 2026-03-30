@@ -3,51 +3,36 @@ import random
 
 class StandardPostings:
     """ 
-    Class dengan static methods, untuk mengubah representasi postings list
-    yang awalnya adalah List of integer, berubah menjadi sequence of bytes.
-    Kita menggunakan Library array di Python.
+    Kelas dengan metode statis untuk mengubah representasi postings list
+    dari list integer menjadi urutan byte (bytes) menggunakan library array.
+    Metode ini tidak melakukan kompresi tambahan (hanya raw bytes).
 
-    ASUMSI: postings_list untuk sebuah term MUAT di memori!
-
-    Silakan pelajari:
-        https://docs.python.org/3/library/array.html
+    Asumsi: postings_list untuk sebuah term muat di memori.
     """
 
     @staticmethod
     def encode(postings_list):
         """
-        Encode postings_list menjadi stream of bytes
+        Mengonversi postings_list menjadi aliran byte (stream of bytes).
 
-        Parameters
-        ----------
-        postings_list: List[int]
-            List of docIDs (postings)
+        Args:
+            postings_list (list): List dari docID (postings).
 
-        Returns
-        -------
-        bytes
-            bytearray yang merepresentasikan urutan integer di postings_list
+        Returns:
+            bytes: Bytearray yang merepresentasikan urutan integer pada postings_list.
         """
-        # Untuk yang standard, gunakan L untuk unsigned long, karena docID
-        # tidak akan negatif. Dan kita asumsikan docID yang paling besar
-        # cukup ditampung di representasi 4 byte unsigned.
         return array.array('L', postings_list).tobytes()
 
     @staticmethod
     def decode(encoded_postings_list):
         """
-        Decodes postings_list dari sebuah stream of bytes
+        Mendekode postings_list dari aliran byte.
 
-        Parameters
-        ----------
-        encoded_postings_list: bytes
-            bytearray merepresentasikan encoded postings list sebagai keluaran
-            dari static method encode di atas.
+        Args:
+            encoded_postings_list (bytes): Bytearray hasil dari metode encode.
 
-        Returns
-        -------
-        List[int]
-            list of docIDs yang merupakan hasil decoding dari encoded_postings_list
+        Returns:
+            list: List of docID hasil dekoding.
         """
         decoded_postings_list = array.array('L')
         decoded_postings_list.frombytes(encoded_postings_list)
@@ -56,78 +41,60 @@ class StandardPostings:
     @staticmethod
     def encode_tf(tf_list):
         """
-        Encode list of term frequencies menjadi stream of bytes
+        Mengonversi list term frequencies menjadi aliran byte.
 
-        Parameters
-        ----------
-        tf_list: List[int]
-            List of term frequencies
+        Args:
+            tf_list (list): List of term frequencies.
 
-        Returns
-        -------
-        bytes
-            bytearray yang merepresentasikan nilai raw TF kemunculan term di setiap
-            dokumen pada list of postings
+        Returns:
+            bytes: Bytearray hasil konversi term frequencies.
         """
         return StandardPostings.encode(tf_list)
 
     @staticmethod
     def decode_tf(encoded_tf_list):
         """
-        Decodes list of term frequencies dari sebuah stream of bytes
+        Mendekode list term frequencies dari aliran byte.
 
-        Parameters
-        ----------
-        encoded_tf_list: bytes
-            bytearray merepresentasikan encoded term frequencies list sebagai keluaran
-            dari static method encode_tf di atas.
+        Args:
+            encoded_tf_list (bytes): Bytearray hasil dari metode encode_tf.
 
-        Returns
-        -------
-        List[int]
-            List of term frequencies yang merupakan hasil decoding dari encoded_tf_list
+        Returns:
+            list: List of term frequencies hasil dekoding.
         """
         return StandardPostings.decode(encoded_tf_list)
 
 class VBEPostings:
     """ 
-    Berbeda dengan StandardPostings, dimana untuk suatu postings list,
-    yang disimpan di disk adalah sequence of integers asli dari postings
-    list tersebut apa adanya.
-
-    Pada VBEPostings, kali ini, yang disimpan adalah gap-nya, kecuali
-    posting yang pertama. Barulah setelah itu di-encode dengan Variable-Byte
-    Enconding algorithm ke bytestream.
+    Kelas untuk kompresi postings list menggunakan algoritma Variable-Byte Encoding (VBE).
+    Berbeda dengan StandardPostings, kelas ini menyimpan gap antar docID (delta encoding),
+    kecuali untuk elemen pertama.
 
     Contoh:
-    postings list [34, 67, 89, 454] akan diubah dulu menjadi gap-based,
-    yaitu [34, 33, 22, 365]. Barulah setelah itu di-encode dengan algoritma
-    compression Variable-Byte Encoding, dan kemudian diubah ke bytesream.
+    postings list [34, 67, 89, 454] diubah menjadi gap-based [34, 33, 22, 365],
+    kemudian di-encode menggunakan algoritma Variable-Byte Encoding.
 
-    ASUMSI: postings_list untuk sebuah term MUAT di memori!
-
+    Asumsi: postings_list untuk sebuah term muat di memori.
     """
 
     @staticmethod
     def vb_encode_number(number):
         """
-        Encodes a number using Variable-Byte Encoding
-        Lihat buku teks kita!
+        Mengonversi sebuah angka menjadi urutan byte menggunakan Variable-Byte Encoding.
         """
         bytes = []
         while True:
-            bytes.insert(0, number % 128) # prepend ke depan
+            bytes.insert(0, number % 128)
             if number < 128:
                 break
             number = number // 128
-        bytes[-1] += 128 # bit awal pada byte terakhir diganti 1
+        bytes[-1] += 128
         return array.array('B', bytes).tobytes()
 
     @staticmethod
     def vb_encode(list_of_numbers):
         """ 
-        Melakukan encoding (tentunya dengan compression) terhadap
-        list of numbers, dengan Variable-Byte Encoding
+        Melakukan encoding terhadap list angka menggunakan Variable-Byte Encoding.
         """
         bytes = []
         for number in list_of_numbers:
@@ -137,19 +104,14 @@ class VBEPostings:
     @staticmethod
     def encode(postings_list):
         """
-        Encode postings_list menjadi stream of bytes (dengan Variable-Byte
-        Encoding). JANGAN LUPA diubah dulu ke gap-based list, sebelum
-        di-encode dan diubah ke bytearray.
+        Mengonversi postings_list menjadi aliran byte (VBE).
+        DocID diubah menjadi bentuk gap-based (delta encoding) sebelum di-encode.
 
-        Parameters
-        ----------
-        postings_list: List[int]
-            List of docIDs (postings)
+        Args:
+            postings_list (list): List dari docID (postings).
 
-        Returns
-        -------
-        bytes
-            bytearray yang merepresentasikan urutan integer di postings_list
+        Returns:
+            bytes: Bytearray hasil kompresi.
         """
         gap_postings_list = [postings_list[0]]
         for i in range(1, len(postings_list)):
@@ -159,26 +121,20 @@ class VBEPostings:
     @staticmethod
     def encode_tf(tf_list):
         """
-        Encode list of term frequencies menjadi stream of bytes
+        Mengonversi list term frequencies menjadi aliran byte menggunakan VBE.
 
-        Parameters
-        ----------
-        tf_list: List[int]
-            List of term frequencies
+        Args:
+            tf_list (list): List of term frequencies.
 
-        Returns
-        -------
-        bytes
-            bytearray yang merepresentasikan nilai raw TF kemunculan term di setiap
-            dokumen pada list of postings
+        Returns:
+            bytes: Bytearray hasil kompresi TF.
         """
         return VBEPostings.vb_encode(tf_list)
 
     @staticmethod
     def vb_decode(encoded_bytestream):
         """
-        Decoding sebuah bytestream yang sebelumnya di-encode dengan
-        variable-byte encoding.
+        Mendekode aliran byte yang menggunakan Variable-Byte Encoding menjadi list angka.
         """
         n = 0
         numbers = []
@@ -197,20 +153,14 @@ class VBEPostings:
     @staticmethod
     def decode(encoded_postings_list):
         """
-        Decodes postings_list dari sebuah stream of bytes. JANGAN LUPA
-        bytestream yang di-decode dari encoded_postings_list masih berupa
-        gap-based list.
+        Mendekode postings_list dari aliran byte (VBE).
+        Hasil dekoding awal yang berupa gap-based akan dikonversi kembali menjadi docID asli.
 
-        Parameters
-        ----------
-        encoded_postings_list: bytes
-            bytearray merepresentasikan encoded postings list sebagai keluaran
-            dari static method encode di atas.
+        Args:
+            encoded_postings_list (bytes): Bytearray hasil kompresi VBE.
 
-        Returns
-        -------
-        List[int]
-            list of docIDs yang merupakan hasil decoding dari encoded_postings_list
+        Returns:
+            list: List of docID asli hasil dekoding.
         """
         decoded_postings_list = VBEPostings.vb_decode(encoded_postings_list)
         total = decoded_postings_list[0]
@@ -223,18 +173,13 @@ class VBEPostings:
     @staticmethod
     def decode_tf(encoded_tf_list):
         """
-        Decodes list of term frequencies dari sebuah stream of bytes
+        Mendekode list term frequencies dari aliran byte menggunakan VBE.
 
-        Parameters
-        ----------
-        encoded_tf_list: bytes
-            bytearray merepresentasikan encoded term frequencies list sebagai keluaran
-            dari static method encode_tf di atas.
+        Args:
+            encoded_tf_list (bytes): Bytearray hasil kompresi VBE untuk TF.
 
-        Returns
-        -------
-        List[int]
-            List of term frequencies yang merupakan hasil decoding dari encoded_tf_list
+        Returns:
+            list: List of term frequencies hasil dekoding.
         """
         return VBEPostings.vb_decode(encoded_tf_list)
 
@@ -242,30 +187,26 @@ class OptPForDeltaPostings:
     BLOCK_SIZE = 128
 
     """ 
-    OptPForDelta compression.
-    Algoritma ini membagi list of integers ke dalam blok-blok berukuran tetap (128),
-    menentukan jumlah bit (b) yang optimal secara heuristik untuk setiap blok, 
-    dan memisahkan nilai-nilai yang tidak muat ke dalam b-bit (exceptions).
+    Kelas untuk kompresi postings list menggunakan algoritma OptPForDelta.
+    Algoritma ini membagi list menjadi blok-blok berukuran tetap (128 elemen),
+    menentukan bit-width (b) yang optimal untuk setiap blok, dan memisahkan
+    pengecualian (exceptions) yang di-encode secara terpisah.
 
-    ASUMSI: 
-    1. postings_list untuk sebuah term MUAT di memori!
-    2. Ukuran blok (N) adalah 128.
+    Asumsi:
+    1. postings_list muat di memori.
+    2. Ukuran blok tetap sebesar 128 elemen.
     """
 
     @staticmethod
     def encode_opt_block(block):
         """
-        Encode satu blok menggunakan OptPForDelta.
+        Mengompresi satu blok menggunakan OptPForDelta.
 
-        Parameters
-        ----------
-        block: List[int]
-            List of gaps
+        Args:
+            block (list): List of gaps atau angka dalam satu blok.
 
-        Returns
-        -------
-        bytes
-            bytearray hasil kompresi OptPForDelta
+        Returns:
+            bytes: Bytearray hasil kompresi satu blok.
         """
         sorted_block = sorted(block)
         b = sorted_block[int(0.9 * (len(sorted_block) - 1))].bit_length()
@@ -277,7 +218,7 @@ class OptPForDeltaPostings:
             if d < (1 << b):
                 main_data.append(d)
             else:
-                main_data.append(0) # Placeholder
+                main_data.append(0)
                 outliers_val.append(d)
                 outliers_idx.append(i)
 
@@ -305,18 +246,13 @@ class OptPForDeltaPostings:
     @staticmethod
     def encode_opt(postings_list):
         """
-        Encode postings_list atau tf_list ke dalam stream of bytes menggunakan OptPForDelta.
-        Method ini membagi list menjadi blok-blok berukuran tetap (BLOCK_SIZE).
+        Mengompresi list angka ke dalam aliran byte menggunakan OptPForDelta per blok.
 
-        Parameters
-        ----------
-        postings_list: List[int]
-            List of numbers (bisa berupa gaps atau raw TF)
+        Args:
+            postings_list (list): List of numbers (gaps atau TF).
 
-        Returns
-        -------
-        bytes
-            bytearray hasil kompresi seluruh list
+        Returns:
+            bytes: Aliran byte hasil kompresi seluruh list.
         """
         N = OptPForDeltaPostings.BLOCK_SIZE
         full_steam = bytearray()
@@ -339,26 +275,14 @@ class OptPForDeltaPostings:
     @staticmethod
     def encode(postings_list):
         """
-        Encode postings_list menjadi stream of bytes menggunakan OptPForDelta.
-        
-        Langkah-langkah:
-        1. Ubah docIDs menjadi gap-based (delta-encoding).
-        2. Bagi list of gaps menjadi blok-blok (misal per 128 elemen).
-        3. Untuk setiap blok:
-           a. Cari nilai 'b' (bit-width) menggunakan heuristik quantile (90%).
-           b. Tentukan elemen mana yang menjadi 'exception' (>= 2^b).
-           c. Simpan b, jumlah elemen, jumlah exception, data b-bit, dan data exception (VBE).
-        4. Gabungkan semua blok menjadi satu bytearray.
+        Mengompresi postings_list menggunakan OptPForDelta.
+        DocID akan diubah menjadi gap-based sebelum dikompresi.
 
-        Parameters
-        ----------
-        postings_list: List[int]
-            List of docIDs (postings)
+        Args:
+            postings_list (list): List of docID (postings).
 
-        Returns
-        -------
-        bytes
-            bytearray hasil kompresi OptPForDelta
+        Returns:
+            bytes: Aliran byte hasil kompresi OptPForDelta.
         """
         gap_postings_list = [postings_list[0]]
         for i in range(1, len(postings_list)):
@@ -369,17 +293,13 @@ class OptPForDeltaPostings:
     @staticmethod
     def decode_opt_block(block_bytes):
         """
-        Decode satu blok dari bytearray hasil encode_opt_block.
+        Mendekode satu blok hasil kompresi OptPForDelta.
 
-        Parameters
-        ----------
-        block_bytes: bytes
-            bytearray yang merepresentasikan satu blok kompresi
+        Args:
+            block_bytes (bytes): Bytearray kompresi per blok.
 
-        Returns
-        -------
-        List[int]
-            List of decoded numbers dalam satu blok
+        Returns:
+            list: List angka yang telah didekode.
         """
         if not block_bytes:
             return []
@@ -415,17 +335,13 @@ class OptPForDeltaPostings:
     @staticmethod
     def decode_opt(encoded_postings_list):
         """
-        Decode seluruh bytearray hasil encode_opt kembali menjadi list of numbers.
+        Mendekode seluruh aliran byte OptPForDelta kembali menjadi list angka.
 
-        Parameters
-        ----------
-        encoded_postings_list: bytes
-            bytearray hasil kompresi encode_opt
+        Args:
+            encoded_postings_list (bytes): Aliran byte hasil kompresi.
 
-        Returns
-        -------
-        List[int]
-            List of numbers (masih berupa gaps atau raw TF)
+        Returns:
+            list: List angka asli (masih dalam bentuk gaps atau TF).
         """
         stream = array.array('B')
         stream.frombytes(encoded_postings_list)
@@ -451,25 +367,14 @@ class OptPForDeltaPostings:
     @staticmethod
     def decode(encoded_postings_list):
         """
-        Decode encoded_postings_list dari stream of bytes kembali ke list of docIDs.
+        Mendekode aliran byte OptPForDelta kembali menjadi list docID asli.
+        Mengonversi kembali dari gap-based menjadi nilai asli (cumulative sum).
 
-        Langkah-langkah:
-        1. Baca stream of bytes blok demi blok.
-        2. Untuk setiap blok:
-           a. Baca header (nilai b, jumlah elemen N, dan jumlah exception).
-           b. Unpack b-bit data sebanyak N elemen.
-           c. Baca data exception dan 'patch' ke posisi yang sesuai di blok.
-        3. Ubah list of gaps kembali menjadi list of docIDs asli (cumulative sum).
+        Args:
+            encoded_postings_list (bytes): Aliran byte hasil kompresi.
 
-        Parameters
-        ----------
-        encoded_postings_list: bytes
-            bytearray hasil encode OptPForDelta
-
-        Returns
-        -------
-        List[int]
-            List of original docIDs
+        Returns:
+            list: List of docID asli.
         """
         decoded_gap_postings_list = OptPForDeltaPostings.decode_opt(encoded_postings_list)
         
@@ -482,34 +387,26 @@ class OptPForDeltaPostings:
     @staticmethod
     def encode_tf(tf_list):
         """
-        Encode list of term frequencies menjadi stream of bytes menggunakan OptPForDelta.
-        
-        Parameters
-        ----------
-        tf_list: List[int]
-            List of term frequencies
+        Mengompresi list term frequencies menggunakan OptPForDelta.
 
-        Returns
-        -------
-        bytes
-            bytearray hasil kompresi OptPForDelta
+        Args:
+            tf_list (list): List of term frequencies.
+
+        Returns:
+            bytes: Aliran byte hasil kompresi.
         """
         return OptPForDeltaPostings.encode_opt(tf_list)
 
     @staticmethod
     def decode_tf(encoded_tf_list):
         """
-        Decode stream of bytes menjadi list of term frequencies.
+        Mendekode aliran byte hasil kompresi TF (OptPForDelta).
 
-        Parameters
-        ----------
-        encoded_tf_list: bytes
-            bytearray hasil encode_tf
+        Args:
+            encoded_tf_list (bytes): Aliran byte hasil kompresi TF.
 
-        Returns
-        -------
-        List[int]
-            List of term frequencies
+        Returns:
+            list: List of term frequencies hasil dekoding.
         """
         return OptPForDeltaPostings.decode_opt(encoded_tf_list)
 
