@@ -107,3 +107,8 @@ python evaluation.py --metric AP --scoring tfidf
 
 - Python 3.x
 - Complete library list available in `requirements.txt`.
+
+## Contributions
+
+- Raden Ahmad Yasin Mahendra (2306215154)
+- LLM (Because sometimes I'm stuck)
